@@ -1,0 +1,6 @@
+La idea viene de mis clases de computación en primaria donde utilizabamos logo writer para hacer dibujos en base a imágenes que nos presentaba la señorita
+Al presentar mi idea Exequiel me indicó que sería más interesante si mi implementación pudiera correr código de otras implementaciones de Logo ya que es un lenguaje ya definido
+Para esto decidí basar las observaciones de mi implementación en la de https://turtleacademy.com/. Utilizé sus tutoriales y su "playgroud" para refrescar mi mente de los comandos necesarios para implementar Logo correctamente
+Así como algunas cosas específicas del lenguaje (o de la implementación de https://turtleacademy.com/), por ej. si el constructor list no está entre parentesis, entonces espera exactamente 2 Expresiones, de lo contrario de error de Parseo
+
+Utilizo gloss para mi implementación gráfica
