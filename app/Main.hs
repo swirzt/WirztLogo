@@ -4,17 +4,18 @@ import Common (Comm)
 -- import Control.Monad
 -- import Control.Monad.Catch (MonadMask)
 -- import Control.Monad.IO.Class
-import Eval (eval)
+
 -- import LogoPar
 
--- import System.Console.Haskeline (InputT, defaultSettings, getInputLine, runInputT)
+import Control.Monad
+import Eval (eval)
 import GlobalEnv
 import Graphics.Gloss
 import Graphics.Gloss.Interface.IO.Animate
 import Graphics.Gloss.Interface.IO.Display (Controller (controllerSetRedraw))
 import Graphics.Gloss.Interface.IO.Interact (Controller (controllerSetRedraw))
+import Graphics.Gloss.Interface.IO.Simulate (ViewPort, simulateIO)
 import Lib
-import MonadLogo
 import MonadLogo
   ( MonadLogo,
     getInput,
@@ -22,8 +23,9 @@ import MonadLogo
     runLogo,
     runLogo',
   )
+import System.Console.Haskeline
 import System.Environment
-import Text.Read
+import Text.Read (readMaybe)
 
 defaultHW :: Int
 defaultHW = 300
@@ -34,37 +36,36 @@ makeWindow h w = InWindow "LOGO" (h, w) (0, 0)
 defaultWindow :: Display
 defaultWindow = makeWindow defaultHW defaultHW
 
-getInputLine :: String -> IO String
-getInputLine s = putStr s >> getLine
-
 runProgram :: Display -> IO ()
-runProgram d = animateIO d white (run defaultEnv) controllerSetRedraw
+runProgram d = simulateIO d white 1000 defaultEnv env2Pic step
 
-run :: Env -> Float -> IO Picture
--- run d = runLogo d (runInputT defaultSettings (repl)) >> return ()
-run e f = do
-  minput <- getInputLine inp
+env2Pic :: Env -> IO Picture
+env2Pic e =
+  let x = posx e
+      y = posy e
+      d = dir e
+      b = GlobalEnv.show e
+      picc = pics e
+      piccc =
+        if b
+          then getTortu x y d : picc
+          else picc
+   in return $ pictures piccc
+
+step :: ViewPort -> Float -> Env -> IO Env
+step v f e = do
+  minput <- runInputT defaultSettings getInp
   case minput of
-    "" -> run e f
+    "" -> step v f e
     _ -> case parserComm minput of
-      Nothing -> run e f
-      Just cms -> do
-        e' <- evalPrint e cms
-        let x = posx e'
-            y = posy e'
-            d = dir e'
-            b = GlobalEnv.show e'
-            picc = pics e'
-            piccc =
-              if b
-                then getTortu x y d : picc
-                else picc
-        return $ pictures piccc
+      Nothing -> step v f e
+      Just cms -> evalPrint e cms
+  where
+    getInp :: InputT IO String
+    getInp = getInputLine inp >>= maybe (return "") return
 
 evalPrint :: Env -> [Comm] -> IO Env
--- evalPrint e [] = return e
 evalPrint e xs = do
-  -- controllerSetRedraw
   r <- runLogo' e (evalinteractivo xs)
   case r of
     Left s -> putStrLn s >> return defaultEnv
@@ -84,26 +85,6 @@ main = do
 
 inp :: String
 inp = ">> "
-
--- repl :: MonadLogo m => m ()
--- repl = do
---   minput <- getInput inp
---   case minput of
---     "" -> repl
---     _ -> case parserComm minput of
---       Nothing -> repl
---       Just cms -> (printLogo $ Prelude.show cms) >> evalinteractivo cms >> repl
-
--- repl :: (MonadLogo m, MonadMask m) => InputT m ()
--- repl = do
---   minput <- getInputLine inp
---   case minput of
---     Nothing -> return ()
---     Just "" -> repl
---     Just x -> do
---       case parserComm x of
---         Nothing -> repl
---         Just cms -> (liftIO $ putStrLn $ show cms) >> evalinteractivo cms >> repl
 
 evalinteractivo :: MonadLogo m => [Comm] -> m ()
 evalinteractivo = foldr ((>>) . eval []) (return ())

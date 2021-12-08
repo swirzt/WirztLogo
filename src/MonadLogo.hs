@@ -13,6 +13,7 @@ import Control.Monad.State
 import qualified Data.Map as M
 import GlobalEnv
 import Graphics.Gloss
+import Graphics.Gloss.Interface.IO.Animate
 import Lib
 import System.IO
 
@@ -32,16 +33,6 @@ printLogo = liftIO . putStrLn
 
 getInput :: MonadLogo m => String -> m String
 getInput i = liftIO (putStr i) >> getLogo
-
--- printGraph :: MonadLogo m => m ()
--- printGraph = do
---   Env x y ang b _ _ pic _ _ d <- get
---   let tortu = getTortu x y ang
---       paraPrint =
---         if b
---           then tortu : pic
---           else pic
---   liftIO $ display d white (pictures paraPrint)
 
 getData :: MonadLogo m => (Env -> a) -> m a
 getData f = get >>= return . f
@@ -102,11 +93,6 @@ penDn = modify (\s -> s {pen = False})
 
 newVar :: MonadLogo m => String -> Exp -> m ()
 newVar str e = modify (\s -> s {vars = M.insert str e (vars s)})
-
--- varr <- getData vars
--- if M.member str varr
---   then failLogo ("Variable: " ++ str ++ ", ya declarada.")
---   else modify (\s -> s {vars = M.insert str e varr})
 
 delVar :: MonadLogo m => String -> m ()
 delVar str = do
