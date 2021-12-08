@@ -1,7 +1,12 @@
 module Lib
-  ( someFunc,
-    parserExp,
+  ( parserExp,
     parserComm,
+    normalize,
+    getTortu,
+    rect,
+    num2color,
+    grad2radian,
+    radian2grad,
   )
 where
 
@@ -16,82 +21,64 @@ import LogoPar
 (.*) :: (c -> d) -> (a -> b -> c) -> (a -> b -> d)
 f .* g = \x y -> f (g x y)
 
-parserExp :: String -> Maybe (Exp String)
+parserExp :: String -> Maybe Exp
 parserExp s =
   let ys = logo $ lexer s
    in either (\e -> Just e) (\_ -> Nothing) ys
 
-parserComm :: String -> Maybe [Comm String]
+parserComm :: String -> Maybe [Comm]
 parserComm s =
   let ys = logo $ lexer s
    in either (\_ -> Nothing) (\c -> Just c) ys
 
-expStr2Bound :: Exp String -> Exp Vars
-expStr2Bound = expStr2Bound' []
+exp2Bound :: Exp -> Exp
+exp2Bound = exp2Bound' []
 
-expStr2Bound' :: [String] -> Exp String -> Exp Vars
-expStr2Bound' _ (Str str) = Str str
-expStr2Bound' _ (Num n) = Num n
-expStr2Bound' _ XCor = XCor
-expStr2Bound' _ YCor = YCor
-expStr2Bound' _ Heading = Heading
-expStr2Bound' v (Towards l) = unary2Bound v l Towards
-expStr2Bound' v (Var str) = maybe (Var $ S str) (Var . B) $ elemIndex str v
-expStr2Bound' v (Sum e1 e2) = binary2Bound v e1 e2 Sum
-expStr2Bound' v (Difference e1 e2) = binary2Bound v e1 e2 Difference
-expStr2Bound' v (Multiply e1 e2) = binary2Bound v e1 e2 Multiply
-expStr2Bound' v (Divide e1 e2) = binary2Bound v e1 e2 Divide
-expStr2Bound' v (First l) = unary2Bound v l First
-expStr2Bound' v (Last l) = unary2Bound v l Last
-expStr2Bound' v (Item l e) = binary2Bound v l e Item
-expStr2Bound' v (RandItem l) = unary2Bound v l RandItem
-expStr2Bound' v (Tail l) = unary2Bound v l Tail
-expStr2Bound' v (RTail l) = unary2Bound v l RTail
-expStr2Bound' _ Read = Read
-expStr2Bound' v (EList l) = EList $ listStr2Bound' v l
+exp2Bound' :: [String] -> Exp -> Exp
+exp2Bound' _ (Num n) = Num n
+exp2Bound' v (Towards x y) = binary2Bound v x y Towards
+exp2Bound' v e@(Var str) = maybe e Access $ elemIndex str v
+exp2Bound' v (Sum e1 e2) = binary2Bound v e1 e2 Sum
+exp2Bound' v (Difference e1 e2) = binary2Bound v e1 e2 Difference
+exp2Bound' v (Multiply e1 e2) = binary2Bound v e1 e2 Multiply
+exp2Bound' v (Divide e1 e2) = binary2Bound v e1 e2 Divide
+exp2Bound' v (IfE e1 e2 e3) =
+  let ee1 = exp2Bound' v e1
+   in binary2Bound v e2 e3 (IfE ee1)
+exp2Bound' _ (Access _) = undefined -- No debería llegar a esto, lo dejo para ver posibles errores
+exp2Bound' v (Gt e1 e2) = binary2Bound v e1 e2 Gt
+exp2Bound' v (Lt e1 e2) = binary2Bound v e1 e2 Lt
+exp2Bound' v (Eq e1 e2) = binary2Bound v e1 e2 Eq
+exp2Bound' v (GEq e1 e2) = binary2Bound v e1 e2 GEq
+exp2Bound' v (LEq e1 e2) = binary2Bound v e1 e2 LEq
+exp2Bound' v (Diff e1 e2) = binary2Bound v e1 e2 Diff
+exp2Bound' v (And b1 b2) = binary2Bound v b1 b2 And
+exp2Bound' v (Or b1 b2) = binary2Bound v b1 b2 Or
+exp2Bound' v (Not b) = unary2Bound v b Not
+exp2Bound' _ XCor = XCor
+exp2Bound' _ YCor = YCor
+exp2Bound' _ Heading = Heading
+exp2Bound' _ Read = Read
+exp2Bound' _ T = T
+exp2Bound' _ F = F
 
-binary2Bound :: [String] -> Exp String -> Exp String -> (Exp Vars -> Exp Vars -> g Vars) -> g Vars
+-- exp2Bound' _ t = t -- Una vez que no haya problema reemplazar los ultimos con esto
+
+binary2Bound :: [String] -> Exp -> Exp -> (Exp -> Exp -> g) -> g
 binary2Bound v e1 e2 f =
-  let ee1 = expStr2Bound' v e1
-      ee2 = expStr2Bound' v e2
+  let ee1 = exp2Bound' v e1
+      ee2 = exp2Bound' v e2
    in f ee1 ee2
 
-unary2Bound :: [String] -> Exp String -> (Exp Vars -> g Vars) -> g Vars
+unary2Bound :: [String] -> Exp -> (Exp -> g) -> g
 unary2Bound v e f =
-  let ee = expStr2Bound' v e
+  let ee = exp2Bound' v e
    in f ee
 
-listStr2Bound :: List String -> List Vars
-listStr2Bound = listStr2Bound' []
-
-listStr2Bound' :: [String] -> List String -> List Vars
-listStr2Bound' v Pos = Pos
-listStr2Bound' v (L xs) = L $ map (bimap (listStr2Bound' v) (expStr2Bound' v)) xs
-
-boolStr2Bound :: Boolen String -> Boolen Vars
-boolStr2Bound = boolStr2Bound' []
-
-boolStr2Bound' :: [String] -> Boolen String -> Boolen Vars
-boolStr2Bound' v (Gt e1 e2) = binary2Bound v e1 e2 Gt
-boolStr2Bound' v (Lt e1 e2) = binary2Bound v e1 e2 Lt
-boolStr2Bound' v (Eq e1 e2) = binary2Bound v e1 e2 Eq
-boolStr2Bound' v (GEq e1 e2) = binary2Bound v e1 e2 GEq
-boolStr2Bound' v (LEq e1 e2) = binary2Bound v e1 e2 LEq
-boolStr2Bound' v (Diff e1 e2) = binary2Bound v e1 e2 Diff
-boolStr2Bound' v (And b1 b2) = bool2Bound v b1 b2 And
-boolStr2Bound' v (Or b1 b2) = bool2Bound v b1 b2 Or
-boolStr2Bound' v (Not b) = bool2Bound v b b (Not .* const)
-
-bool2Bound :: [String] -> Boolen String -> Boolen String -> (Boolen Vars -> Boolen Vars -> g Vars) -> g Vars
-bool2Bound v e1 e2 f =
-  let ee1 = boolStr2Bound' v e1
-      ee2 = boolStr2Bound' v e2
-   in f ee1 ee2
-
-commStr2Bound :: Comm String -> Comm Vars
+commStr2Bound :: Comm -> Comm
 commStr2Bound = commStr2Bound' []
 
-commStr2Bound' :: [String] -> Comm String -> Comm Vars
+commStr2Bound' :: [String] -> Comm -> Comm
 commStr2Bound' v (Ford e) = unary2Bound v e Ford
 commStr2Bound' v (Back e) = unary2Bound v e Back
 commStr2Bound' v (TRight e) = unary2Bound v e TRight
@@ -109,38 +96,72 @@ commStr2Bound' v (SetXY e1 e2) = binary2Bound v e1 e2 SetXY
 commStr2Bound' v (SetHead e) = unary2Bound v e SetHead
 commStr2Bound' v (Rep e xs) =
   let ys = map (commStr2Bound' v) xs
-      ee = expStr2Bound' v e
+      ee = exp2Bound' v e
    in Rep ee ys
 commStr2Bound' v (Print e) = unary2Bound v e Print
-commStr2Bound' v (Def str xsS xsC) = Def str xsS $ map (commStr2Bound' (xsS ++ v)) xsC
+commStr2Bound' _ e@(PrintStr _) = e
 commStr2Bound' v (SetCo e) = unary2Bound v e SetCo
-commStr2Bound' v (DefV str e) = unary2Bound v e (DefV str)
+commStr2Bound' v (IfC e xs ys) =
+  let xs' = map (commStr2Bound' v) xs
+      ys' = map (commStr2Bound' v) ys
+      ee = exp2Bound' v e
+   in IfC ee xs' ys'
+commStr2Bound' v (Def str ns cs) = Def str ns $ map (commStr2Bound' (ns ++ v)) cs
+commStr2Bound' v (Save str e) = unary2Bound v e (Save str)
 commStr2Bound' v (ForDelta str e1 e2 e3 xs) =
-  let ys = map (commStr2Bound' v) xs
-      ee1 = expStr2Bound' v e1
-      ee2 = expStr2Bound' v e2
-      ee3 = expStr2Bound' v e3
+  let v' = str : v
+      ys = map (commStr2Bound' v') xs
+      ee1 = exp2Bound' v' e1
+      ee2 = exp2Bound' v' e2
+      ee3 = exp2Bound' v' e3
    in ForDelta str ee1 ee2 ee3 ys
 commStr2Bound' v (For str e1 e2 xs) =
-  let ys = map (commStr2Bound' v) xs
-      f = \x y -> For str x y ys
-   in binary2Bound v e1 e2 f
-commStr2Bound' v (If b xs) =
-  let ys = map (commStr2Bound' v) xs
-      f = \x _ -> If x ys
-   in bool2Bound v b b f
-commStr2Bound' _ Fill = Fill
-commStr2Bound' v (Filled e xs) =
-  let ys = map (commStr2Bound' v) xs
-      f = \x -> Filled x ys
-   in unary2Bound v e f
+  let v' = str : v
+      ys = map (commStr2Bound' v') xs
+      ee1 = exp2Bound' v' e1
+      ee2 = exp2Bound' v' e2
+   in For str ee1 ee2 ys
 commStr2Bound' v (Wait e) = unary2Bound v e Wait
-commStr2Bound' v (While xs b) =
+commStr2Bound' v (While b xs) =
   let ys = map (commStr2Bound' v) xs
-   in bool2Bound v b b (While ys .* const)
+      bb = exp2Bound' v b
+   in While bb ys
+commStr2Bound' v (DoWhile xs b) =
+  let ys = map (commStr2Bound' v) xs
+      bb = exp2Bound' v b
+   in DoWhile ys bb
 commStr2Bound' v (CommVar str xs) =
-  let ys = listStr2Bound' v xs
+  let ys = map (exp2Bound' v) xs
    in CommVar str ys
+commStr2Bound' _ Skip = Skip
+
+-- expUnbound :: [Exp] -> Exp -> Exp
+-- expUnbound _ (Num n) = Num n
+-- expUnbound v (Towards x y) = binary2Bound v x y Towards
+-- expUnbound v e@(Var str) = maybe e Access $ elemIndex str v
+-- expUnbound v (Sum e1 e2) = binary2Bound v e1 e2 Sum
+-- expUnbound v (Difference e1 e2) = binary2Bound v e1 e2 Difference
+-- expUnbound v (Multiply e1 e2) = binary2Bound v e1 e2 Multiply
+-- expUnbound v (Divide e1 e2) = binary2Bound v e1 e2 Divide
+-- expUnbound v (IfE e1 e2 e3) =
+--   let ee1 = expUnbound v e1
+--    in binary2Bound v e2 e3 (IfE ee1)
+-- expUnbound _ (Access _) = undefined -- No debería llegar a esto, lo dejo para ver posibles errores
+-- expUnbound v (Gt e1 e2) = binary2Bound v e1 e2 Gt
+-- expUnbound v (Lt e1 e2) = binary2Bound v e1 e2 Lt
+-- expUnbound v (Eq e1 e2) = binary2Bound v e1 e2 Eq
+-- expUnbound v (GEq e1 e2) = binary2Bound v e1 e2 GEq
+-- expUnbound v (LEq e1 e2) = binary2Bound v e1 e2 LEq
+-- expUnbound v (Diff e1 e2) = binary2Bound v e1 e2 Diff
+-- expUnbound v (And b1 b2) = binary2Bound v b1 b2 And
+-- expUnbound v (Or b1 b2) = binary2Bound v b1 b2 Or
+-- expUnbound v (Not b) = unary2Bound v b Not
+-- expUnbound _ XCor = XCor
+-- expUnbound _ YCor = YCor
+-- expUnbound _ Heading = Heading
+-- expUnbound _ Read = Read
+-- expUnbound _ T = T
+-- expUnbound _ F = F
 
 data Either3 a b c = Izq a | Medio b | Der c
 
@@ -162,5 +183,72 @@ either3 f _ _ (Izq a) = f a
 either3 _ g _ (Medio b) = g b
 either3 _ _ h (Der c) = h c
 
-someFunc :: IO ()
-someFunc = undefined
+map3 :: (a -> d) -> (b -> e) -> (c -> f) -> Either3 a b c -> Either3 d e f
+map3 f _ _ (Izq a) = Izq $ f a
+map3 _ g _ (Medio b) = Medio $ g b
+map3 _ _ h (Der c) = Der $ h c
+
+dospi :: Float
+dospi = 2 * pi
+
+grad2radian :: Float -> Float
+grad2radian n = n / 180 * pi
+
+radian2grad :: Float -> Float
+radian2grad n = n * 180 / pi
+
+repeatUntil :: (a -> Bool) -> (a -> a) -> a -> a
+repeatUntil c f x
+  | c x = x
+  | otherwise = repeatUntil c f (f x)
+
+-- Mantiene el ángulo entre 0 y 2pi
+normalize :: Float -> Float
+normalize n =
+  if n < 0
+    then repeatUntil (0 <=) (+ dospi) n
+    else
+      if n > dospi
+        then repeatUntil (dospi >=) (\x -> x - dospi) n
+        else n
+
+rect :: Float -> Float -> Picture
+rect x y = polygon $ rectanglePath x y
+
+-- Esta tortuga mira por defecto para la derecha ya que es lo que le corresponde al angulo 0
+tortuga :: Picture
+tortuga =
+  color green $
+    pictures
+      [ rect 30 40, -- cuerpo tortuga
+        translate 0 24 $ rect 7 8, -- cabeza
+        translate 18 15 $ rect 6 6, -- pata delantera derecha
+        translate 18 (-15) $ rect 6 6, -- pata delantera izquierda
+        translate (-18) 15 $ rect 6 6, -- pata trasera derecha
+        translate (-18) (-15) $ rect 6 6 -- pata trasera izquierda
+      ]
+
+getTortu :: Float -> Float -> Float -> Picture
+getTortu x y n = translate x y $ rotate n tortuga
+
+customColor :: Float -> Float -> Float -> Color
+customColor r g b = makeColor (r / 255) (g / 255) (b / 255) 1
+
+num2color :: Int -> Color
+num2color i = case i of
+  0 -> black
+  1 -> blue
+  2 -> customColor 0 255 0
+  3 -> cyan
+  4 -> red
+  5 -> magenta
+  6 -> yellow
+  7 -> white
+  8 -> customColor 165 42 42
+  9 -> customColor 210 180 140
+  10 -> green
+  11 -> aquamarine
+  12 -> customColor 250 128 114
+  13 -> customColor 128 0 128
+  14 -> orange
+  15 -> customColor 128 128 128

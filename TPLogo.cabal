@@ -45,6 +45,7 @@ library
     , haskeline
     , mtl
     , random >=1.2.1
+    , relude
   default-language: Haskell2010
 
 executable TPLogo-exe
@@ -64,6 +65,7 @@ executable TPLogo-exe
     , haskeline
     , mtl
     , random >=1.2.1
+    , relude
   default-language: Haskell2010
 
 test-suite TPLogo-test
@@ -84,4 +86,5 @@ test-suite TPLogo-test
     , haskeline
     , mtl
     , random >=1.2.1
+    , relude
   default-language: Haskell2010

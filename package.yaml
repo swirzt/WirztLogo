@@ -28,6 +28,7 @@ dependencies:
 - mtl
 - haskeline
 - exceptions
+- relude
 
 library:
   source-dirs: src

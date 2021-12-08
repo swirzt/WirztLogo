@@ -32,33 +32,13 @@ import Data.Char
       make              { TokenMk }
       for               { TokenFor }
       if                { TokenIf }
-      fill              { TokenFill }
-      filled            { TokenFilled }
       wait              { TokenWait }
-      'do.while'        { TokenWhile }
-      
-      pos               { TokenPos }
-      list              { TokenList }
-      tuple             { TokenTup }
-      
-      xcor              { TokenXCor }
-      ycor              { TokenYCor }
-      heading           { TokenHead }
-      towards           { TokenTow }
-      ':'               { TokenRef }
-      sum               { TokenSum }
-      difference        { TokenDiff }
-      first             { TokenFst }
-      last              { TokenLst }
-      item              { TokenItem }
-      pick              { TokenPick }
-      butfirst          { TokenTail }
-      butlast           { TokenRTail }
-      readword          { TokenRead }
-
-      varE              { TokenVarE $$ }
+      'do.while'        { TokenDoWhile }
+      while             { TokenWhile }
+      skip              { TokenSkip }
       varC              { TokenVarC $$ }
-      num               { TokenNum $$ }
+      
+
       str               { TokenStr $$ }
       '('               { TokenPA }
       ')'               { TokenPC }
@@ -66,6 +46,13 @@ import Data.Char
       ']'               { TokenCC }
 
 
+      num               { TokenNum $$ }
+      xcor              { TokenXCor }
+      ycor              { TokenYCor }
+      heading           { TokenHead }
+      towards           { TokenTow }
+      varE              { TokenVarE $$ }
+      readword          { TokenRead }
       '>'               { TokenMayor }
       '<'               { TokenMenor }
       '='               { TokenIgual }
@@ -77,8 +64,10 @@ import Data.Char
       not               { TokenNo }
       '*'               { TokenMul }
       '/'               { TokenDiv }
-      '+'               { TokenSSum }
-      '-'               { TokenSDiff }
+      '+'               { TokenSum }
+      '-'               { TokenDiff }
+      true              { TokenTrue }
+      false             { TokenFalse }
 
 %left '&&' '||'
 %nonassoc not
@@ -89,15 +78,18 @@ import Data.Char
 
 
 %%
-CommExp :: { Either (Exp String) [Comm String] }
-CommExp : CommSeq           { Right $1 }
-        | Exp               { Left $1 }
+Par :: { Either Exp [Comm] }
+Par : Exp          { Left $1 }
+    | CommSeq      { Right $1 }
 
-CommSeq :: { [Comm String] }
-CommSeq : Comm              { [$1] }
-        | Comm CommSeq      { $1 : $2 }
+CommSeq :: { [Comm] }
+CommSeq : CommSeqR           { reverse $1 }
 
-Comm :: { Comm String }
+CommSeqR :: { [Comm] }
+CommSeqR : Comm              { [$1] }
+         | CommSeqR Comm     { $2 : $1 }
+
+Comm :: { Comm }
 Comm : fordward Exp                                { Ford $2 }
      | back Exp                                    { Back $2 }
      | right Exp                                   { TRight $2 }
@@ -115,73 +107,60 @@ Comm : fordward Exp                                { Ford $2 }
      | setheading Exp                              { SetHead $2 }
      | repeat Exp '[' CommSeq ']'                  { Rep $2 $4 }
      | print Exp                                   { Print $2 }
-     | to varC Args CommSeq end                    { Def $2 $3 $4 }
+     | print str                                   { PrintStr $2 }
      | setcolor Exp                                { SetCo $2 }
-     | make str Exp                                { DefV $2 $3 }
-     | for List '[' CommSeq ']'                    { For $3 $4 $5 $8 }
-     | if Bool '[' CommSeq ']'                     { IfC $2 $4 }
-     | fill                                        { Fill }
-     | filled Exp '[' CommSeq ']'                  { Filled $2 $4 }
+     | if Exp '[' CommSeq ']' '[' CommSeq ']'      { IfC $2 $4 $7 }
+     | to varC Args '[' CommSeq ']' end            { Def $2 $3 $5 }
+     | make str Exp                                { Save $2 $3 }
+     | for '[' str Exp Exp ']' '[' CommSeq ']'     { For $3 $4 $5 $8 }
+     | for '[' str Exp Exp Exp ']' '[' CommSeq ']' { ForDelta $3 $4 $5 $6 $9 }
      | wait Exp                                    { Wait $2 }
-     | 'do.while' '[' CommSeq ']' Bool             { While $3 $5 }
-     | varC List                                   { CommVar $1 $2 }
+     | while Exp '[' CommSeq ']'                   { While $2 $4 }
+     | 'do.while' '[' CommSeq ']' Exp              { DoWhile $3 $5 }
+     | varC ExpSeq                                 { CommVar $1 $2 }
+     | skip                                        { Skip }
      | '(' Comm ')'                                { $2 }
 
-Exp :: { Exp String }
+Args :: { [String] }
+Args : ArgsR              { reverse $1 }
+
+ArgsR :: { [String] }
+ArgsR : str               { [$1] }
+      | ArgsR str         { $2 : $1 }
+      | {- empty -}       { [] }
+
+ExpSeq :: { [Exp] }
+ExpSeq : ExpSeqR          { reverse $1 }
+
+ExpSeqR :: { [Exp] }
+ExpSeqR : Exp             { [$1] }
+        | ExpSeqR Exp     { $2 : $1 }
+
+Exp :: { Exp }
 Exp : num                  { Num $1 }
     | xcor                 { XCor }
     | ycor                 { YCor } 
     | heading              { Heading }                       
-    | towards Exp          { Towards $2 }
+    | towards Exp Exp      { Towards $2 $3 }
     | varE                 { Var $1 }
-    | sum Exp Exp          { Sum $2 $3 }
-    | difference Exp Exp   { Difference $2 $3 }
-    | first Exp            { First $2 }
-    | last Exp             { Last $2 }
-    | item Exp Exp         { Item $2 $3 }
-    | pick Exp             { RandItem $2 }
-    | butfirst Exp         { Tail $2 }
-    | butlast Exp          { RTail $2 }
-    | readword             { Read }
     | Exp '+' Exp          { Sum $1 $3 }
     | Exp '-' Exp          { Difference $1 $3 }
     | Exp '/' Exp          { Divide $1 $3 }
     | Exp '*' Exp          { Multiply $1 $3 }
-    | str                  { Str $1 }
-    | List                 { EList $1 }
-    | if Bool List         { IfE $2 $3 }
+    | readword             { Read }
+    | if Exp Exp Exp       { IfE $2 $3 $4 }
+    | Exp '>' Exp          { Gt $1 $3 }
+    | Exp '<' Exp          { Lt $1 $3 }
+    | Exp '=' Exp          { Eq $1 $3 }
+    | Exp '>=' Exp         { GEq $1 $3 }
+    | Exp '<=' Exp         { LEq $1 $3 }
+    | Exp '!=' Exp         { Diff $1 $3 }
+    | Exp '&&' Exp         { And $1 $3 }
+    | Exp '||' Exp         { Or $1 $3 }
+    | not Exp              { Not $2 }
+    | true                 { T }
+    | false                { F }
     | '(' Exp ')'          { $2 }
-
-
-EL :: { Either (List String) (Exp String) }
-EL : Exp                  { Right $1 }
-   | List                 { Left $1 }
-
-List :: { List String }
-List : pos                { Pos }
-     | tuple EL EL        { L [$2, $3] }
-     | '[' Seq ']'        { L $2 }
-     | '(' list Seq ')'   { L $3 }
-
-Seq :: { [Either (List String) (Exp String)] }
-Seq : EL              { [$1] }
-    | EL Seq          { $1 : $2 }
-
-Args :: { [String] }
-Args : varE        { [$1] }
-     | varE Args   { $1 : $2 }
-
-Bool :: { Boolen String }
-Bool : Exp '>' Exp     { Gt $1 $3 }
-     | Exp '<' Exp     { Lt $1 $3 }
-     | Exp '=' Exp     { Eq $1 $3 }
-     | Exp '>=' Exp    { GEq $1 $3 }
-     | Exp '<=' Exp    { LEq $1 $3 }
-     | Exp '!=' Exp    { Diff $1 $3 }
-     | Bool '&&' Bool  { And $1 $3 }
-     | Bool '||' Bool  { Or $1 $3 }
-     | not Bool        { Not $2 }
-     | '(' Bool ')'    { $2 }
 
 {
 parseError :: [Token] -> a
@@ -210,26 +189,15 @@ data Token = TokenFd
            | TokenMk  
            | TokenFor  
            | TokenIf
-           | TokenFill  
-           | TokenFilled
            | TokenWait 
            | TokenWhile
-           | TokenPos 
-           | TokenList
-           | TokenTup
+           | TokenDoWhile
+           | TokenSkip
            | TokenXCor 
-           | TokenYCor 
-           | TokenHead 
+           | TokenYCor
+           | TokenHead
            | TokenTow 
            | TokenRef 
-           | TokenSum 
-           | TokenDiff 
-           | TokenFst 
-           | TokenLst 
-           | TokenItem 
-           | TokenPick 
-           | TokenTail 
-           | TokenRTail
            | TokenRead 
            | TokenVarE String
            | TokenVarC String
@@ -250,18 +218,21 @@ data Token = TokenFd
            | TokenNo
            | TokenMul
            | TokenDiv
-           | TokenSSum
-           | TokenSDiff
+           | TokenSum
+           | TokenDiff
+           | TokenTrue
+           | TokenFalse
 
 lexer :: String -> [Token]
 lexer = lexer' . map toLower
 
 lexer' :: String -> [Token]
 lexer' [] = []
-lexer' (c:cs) 
+lexer' s@(c:cs) 
       | isSpace c = lexer' cs
-      | isAlpha c = lexVar (c:cs)
-      | isDigit c = lexNum (c:cs)
+      | isAlpha c = lexVar s
+      | isDigit c = lexNum s
+lexer' s@('.':c:cs) | isDigit c = lexNum ('0':s)
 lexer' ('"':cs) = let (str, rest) = lexStr cs
                   in TokenStr str : rest
 lexer' (':':cs) = let (str, rest) = lexStr cs
@@ -272,16 +243,14 @@ lexer' ('!':'=':cs) = TokenNoIgual : lexer' cs
 lexer' ('>':cs) = TokenMayor : lexer' cs
 lexer' ('<':cs) = TokenMenor : lexer' cs
 lexer' ('=':cs) = TokenIgual : lexer' cs
-lexer' ('(':cs) = case lexer' cs of
-                    TokenTup:xs -> TokenPA : TokenList : xs
-                    xs -> TokenPA : xs
+lexer' ('(':cs) = TokenPA : lexer' cs
 lexer' (')':cs) = TokenPC : lexer' cs
 lexer' ('[':cs) = TokenCA : lexer' cs
 lexer' (']':cs) = TokenCC : lexer' cs
 lexer' ('*':cs) = TokenMul : lexer' cs
 lexer' ('/':cs) = TokenDiv : lexer' cs
-lexer' ('+':cs) = TokenSSum : lexer' cs
-lexer' ('-':cs) = TokenSDiff : lexer' cs
+lexer' ('+':cs) = TokenSum : lexer' cs
+lexer' ('-':cs) = TokenDiff : lexer' cs
 
 lexStr cs = (str, lexer' rest)
       where (str, rest) = span isAlphaNum cs
@@ -324,27 +293,19 @@ lexVar cs =
       ("make",rest) -> TokenMk : lexer' rest
       ("for",rest) -> TokenFor : lexer' rest
       ("if",rest) -> TokenIf : lexer' rest
-      ("fill",rest) -> TokenFill : lexer' rest
-      ("filled",rest) -> TokenFilled : lexer' rest
       ("wait",rest) -> TokenWait : lexer' rest
-      ("do.while",rest) -> TokenWhile : lexer' rest
-      ("pos",rest) -> TokenPos : lexer' rest
-      ("list",rest) -> TokenTup : lexer' rest
+      ("do.while",rest) -> TokenDoWhile : lexer' rest
+      ("while",rest) -> TokenWhile : lexer' rest
+      ("skip",rest) -> TokenSkip : lexer' rest
       ("xcor",rest) -> TokenXCor : lexer' rest
       ("ycor",rest) -> TokenYCor : lexer' rest
       ("heading",rest) -> TokenHead : lexer' rest
       ("towards",rest) -> TokenTow : lexer' rest
-      ("sum",rest) -> TokenSum : lexer' rest
-      ("difference",rest) -> TokenDiff : lexer' rest
-      ("first",rest) -> TokenFst : lexer' rest
-      ("last",rest) -> TokenLst : lexer' rest
-      ("item",rest) -> TokenItem : lexer' rest
-      ("pick",rest) -> TokenPick : lexer' rest
-      ("butfirst",rest) -> TokenTail : lexer' rest
-      ("butlast",rest) -> TokenRTail : lexer' rest
       ("readword",rest) -> TokenRead : lexer' rest
       ("not",rest) -> TokenNo : lexer' rest
-      (var,rest)   -> TokenVarC var : lexer' rest
+      ("true",rest) -> TokenTrue : lexer' rest
+      ("false",rest) -> TokenFalse : lexer' rest
+      (var,rest) -> TokenVarC var : lexer' rest
 
 
 }

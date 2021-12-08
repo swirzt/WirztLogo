@@ -7,12 +7,14 @@
 module MonadLogo where
 
 import Common
+import Control.Concurrent
 import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Writer
 import qualified Data.Map as M
 import GlobalEnv
 import Graphics.Gloss
+import Lib
 import System.IO
 
 class (MonadIO m, MonadState Env m, MonadError String m) => MonadLogo m
@@ -31,13 +33,13 @@ printLogo = liftIO . putStrLn
 
 printGraph :: MonadLogo m => m ()
 printGraph = do
-  Env x y b _ ang pics _ _ (d, c) <- get
+  Env x y ang b _ _ pics _ _ d <- get
   let tortu = getTortu x y ang
       paraPrint =
         if b
           then tortu : pics
           else pics
-  liftIO $ display d c (pictures pics)
+  liftIO $ display d white (pictures pics)
 
 getData :: MonadLogo m => (Env -> a) -> m a
 getData f = get >>= return . f
@@ -48,15 +50,17 @@ getX = getData posx
 getY :: MonadLogo m => m Float
 getY = getData posy
 
-getAng :: MonadLogo m => m Float
-getAng = getData dir
+getDir :: MonadLogo m => m Float
+getDir = getData dir
 
 addPicture :: MonadLogo m => Picture -> m ()
 addPicture p = do
   b <- getData pen
+  c <- getData GlobalEnv.color
+  let pp = Color c p
   if b
     then nada
-    else modify (\s -> s {pics = p : pics s})
+    else modify (\s -> s {pics = pp : pics s})
 
 resetPics :: MonadLogo m => m ()
 resetPics = modify (\s -> s {pics = []})
@@ -73,35 +77,14 @@ setY n = modify (\s -> s {posy = n})
 changeY :: MonadLogo m => (Float -> Float -> Float) -> Float -> m ()
 changeY f n = getData posy >>= \y -> setY (f y n)
 
-setAng :: MonadLogo m => Float -> m ()
-setAng n = modify (\s -> s {dir = n})
+setDir :: MonadLogo m => Float -> m ()
+setDir n = modify (\s -> s {dir = n})
 
-grad2radian :: Float -> Float
-grad2radian n = n / 180 * pi
+changeDir :: MonadLogo m => (Float -> Float -> Float) -> Float -> m ()
+changeDir f n = modify (\s -> s {dir = normalize (f (dir s) n)})
 
-radian2grad :: Float -> Float
-radian2grad n = n * 180 / pi
-
-repeatUntil :: (a -> Bool) -> (a -> a) -> a -> a
-repeatUntil c f x
-  | c x = x
-  | otherwise = repeatUntil c f (f x)
-
-dospi :: Float
-dospi = 2 * pi
-
--- Mantiene el ángulo entre 0 y 2pi
-normalize :: Float -> Float
-normalize n =
-  if n < 0
-    then repeatUntil (0 <=) (+ dospi) n
-    else
-      if n > dospi
-        then repeatUntil (dospi >=) (\x -> x - dospi) n
-        else n
-
-changeAng :: MonadLogo m => (Float -> Float -> Float) -> Float -> m ()
-changeAng f n = modify (\s -> s {dir = normalize (f (dir s) n)})
+setColor :: MonadLogo m => Int -> m ()
+setColor n = modify (\s -> s {GlobalEnv.color = num2color n})
 
 showT :: MonadLogo m => m ()
 showT = modify (\s -> s {GlobalEnv.show = True})
@@ -115,7 +98,7 @@ penUp = modify (\s -> s {pen = True})
 penDn :: MonadLogo m => m ()
 penDn = modify (\s -> s {pen = False})
 
-newVar :: MonadLogo m => String -> Exp Vars -> m ()
+newVar :: MonadLogo m => String -> Exp -> m ()
 newVar str e = do
   varr <- getData vars
   if M.member str varr
@@ -129,7 +112,7 @@ delVar str = do
     then failLogo ("Variable: " ++ str ++ ", no está definida, no se puede eliminar.")
     else modify (\s -> s {vars = M.delete str varr})
 
-getVar :: MonadLogo m => String -> m (Exp Vars)
+getVar :: MonadLogo m => String -> m Exp
 getVar str = do
   varr <- getData vars
   let mv = M.lookup str varr
@@ -137,12 +120,12 @@ getVar str = do
     Nothing -> failLogo ("Variable: " ++ str ++ ", no está definida, no se puede acceder.")
     Just e -> return e
 
-newComm :: MonadLogo m => String -> Comm Vars -> m ()
-newComm str c = do
+newComm :: MonadLogo m => String -> Int -> [Comm] -> m ()
+newComm str n c = do
   comm <- getData comms
   if M.member str comm
     then failLogo ("comando: " ++ str ++ ", ya declarado.")
-    else modify (\s -> s {comms = M.insert str c comm})
+    else modify (\s -> s {comms = M.insert str (n, c) comm})
 
 delComm :: MonadLogo m => String -> m ()
 delComm str = do
@@ -151,13 +134,16 @@ delComm str = do
     then failLogo ("Comando: " ++ str ++ ", no está definido, no se puede eliminar.")
     else modify (\s -> s {comms = M.delete str comm})
 
-getComm :: MonadLogo m => String -> m (Comm Vars)
+getComm :: MonadLogo m => String -> m (Int, [Comm])
 getComm str = do
   comm <- getData comms
   let mv = M.lookup str comm
   case mv of
     Nothing -> failLogo ("Comando: " ++ str ++ ", no está definido, no se puede acceder.")
     Just c -> return c
+
+wait :: MonadLogo m => Int -> m ()
+wait = liftIO . threadDelay
 
 catchErrors :: MonadLogo m => m a -> m (Maybe a)
 catchErrors c =
@@ -173,5 +159,5 @@ type Logo = StateT Env (ExceptT String IO)
 
 instance MonadLogo Logo
 
-runLogo :: Display -> Color -> Logo a -> IO (Either String (a, Env))
-runLogo d c m = runExceptT $ runStateT m $ defaultEnv d c
+runLogo :: Display -> Logo a -> IO (Either String (a, Env))
+runLogo d m = runExceptT $ runStateT m $ defaultEnv d
