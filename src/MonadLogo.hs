@@ -22,26 +22,26 @@ nada :: MonadLogo m => m ()
 nada = return ()
 
 failLogo :: MonadLogo m => String -> m a
-failLogo str = throwError str
+failLogo = throwError
 
 getLogo :: MonadLogo m => m String
-getLogo = liftIO $ getLine
+getLogo = liftIO getLine
 
 printLogo :: MonadLogo m => String -> m ()
 printLogo = liftIO . putStrLn
 
 getInput :: MonadLogo m => String -> m String
-getInput i = (liftIO $ putStr i) >> getLogo
+getInput i = liftIO (putStr i) >> getLogo
 
-printGraph :: MonadLogo m => m ()
-printGraph = do
-  Env x y ang b _ _ pic _ _ d <- get
-  let tortu = getTortu x y ang
-      paraPrint =
-        if b
-          then tortu : pic
-          else pic
-  liftIO $ display d white (pictures paraPrint)
+-- printGraph :: MonadLogo m => m ()
+-- printGraph = do
+--   Env x y ang b _ _ pic _ _ d <- get
+--   let tortu = getTortu x y ang
+--       paraPrint =
+--         if b
+--           then tortu : pic
+--           else pic
+--   liftIO $ display d white (pictures paraPrint)
 
 getData :: MonadLogo m => (Env -> a) -> m a
 getData f = get >>= return . f
@@ -101,11 +101,12 @@ penDn :: MonadLogo m => m ()
 penDn = modify (\s -> s {pen = False})
 
 newVar :: MonadLogo m => String -> Exp -> m ()
-newVar str e = do
-  varr <- getData vars
-  if M.member str varr
-    then failLogo ("Variable: " ++ str ++ ", ya declarada.")
-    else modify (\s -> s {vars = M.insert str e varr})
+newVar str e = modify (\s -> s {vars = M.insert str e (vars s)})
+
+-- varr <- getData vars
+-- if M.member str varr
+--   then failLogo ("Variable: " ++ str ++ ", ya declarada.")
+--   else modify (\s -> s {vars = M.insert str e varr})
 
 delVar :: MonadLogo m => String -> m ()
 delVar str = do
@@ -153,7 +154,7 @@ catchErrors c =
     (Just <$> c)
     ( \e ->
         liftIO $
-          hPutStrLn stderr (Prelude.show e)
+          print e
             >> return Nothing
     )
 
@@ -161,5 +162,8 @@ type Logo = StateT Env (ExceptT String IO)
 
 instance MonadLogo Logo
 
-runLogo :: Display -> Logo a -> IO (Either String (a, Env))
-runLogo d m = runExceptT $ runStateT m $ defaultEnv d
+runLogo :: Logo a -> IO (Either String (a, Env))
+runLogo m = runExceptT $ runStateT m defaultEnv
+
+runLogo' :: Env -> Logo a -> IO (Either String (a, Env))
+runLogo' e m = runExceptT $ runStateT m e

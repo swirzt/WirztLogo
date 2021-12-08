@@ -58,14 +58,13 @@ exp2Bound' v (Diff e1 e2) = binary2Bound v e1 e2 Diff
 exp2Bound' v (And b1 b2) = binary2Bound v b1 b2 And
 exp2Bound' v (Or b1 b2) = binary2Bound v b1 b2 Or
 exp2Bound' v (Not b) = unary2Bound v b Not
-exp2Bound' _ XCor = XCor
-exp2Bound' _ YCor = YCor
-exp2Bound' _ Heading = Heading
-exp2Bound' _ Read = Read
-exp2Bound' _ T = T
-exp2Bound' _ F = F
-
--- exp2Bound' _ t = t -- Una vez que no haya problema reemplazar los ultimos con esto
+-- exp2Bound' _ XCor = XCor
+-- exp2Bound' _ YCor = YCor
+-- exp2Bound' _ Heading = Heading
+-- exp2Bound' _ Read = Read
+-- exp2Bound' _ T = T
+-- exp2Bound' _ F = F
+exp2Bound' _ t = t -- Una vez que no haya problema reemplazar los ultimos con esto
 
 binary2Bound :: [String] -> Exp -> Exp -> (Exp -> Exp -> g) -> g
 binary2Bound v e1 e2 f =
@@ -86,13 +85,6 @@ comm2Bound' v (Ford e) = unary2Bound v e Ford
 comm2Bound' v (Back e) = unary2Bound v e Back
 comm2Bound' v (TRight e) = unary2Bound v e TRight
 comm2Bound' v (TLeft e) = unary2Bound v e TLeft
-comm2Bound' _ Clear = Clear
-comm2Bound' _ Clean = Clean
-comm2Bound' _ PUp = PUp
-comm2Bound' _ PDown = PDown
-comm2Bound' _ HideT = HideT
-comm2Bound' _ ShowT = ShowT
-comm2Bound' _ Home = Home
 comm2Bound' v (SetX e) = unary2Bound v e SetX
 comm2Bound' v (SetY e) = unary2Bound v e SetY
 comm2Bound' v (SetXY e1 e2) = binary2Bound v e1 e2 SetXY
@@ -102,7 +94,6 @@ comm2Bound' v (Rep e xs) =
       ee = exp2Bound' v e
    in Rep ee ys
 comm2Bound' v (Print e) = unary2Bound v e Print
-comm2Bound' _ e@(PrintStr _) = e
 comm2Bound' v (SetCo e) = unary2Bound v e SetCo
 comm2Bound' v (IfC e xs ys) =
   let xs' = map (comm2Bound' v) xs
@@ -136,7 +127,16 @@ comm2Bound' v (DoWhile xs b) =
 comm2Bound' v (CommVar str xs) =
   let ys = map (exp2Bound' v) xs
    in CommVar str ys
-comm2Bound' _ Skip = Skip
+-- comm2Bound' _ Clear = Clear
+-- comm2Bound' _ Clean = Clean
+-- comm2Bound' _ PUp = PUp
+-- comm2Bound' _ PDown = PDown
+-- comm2Bound' _ HideT = HideT
+-- comm2Bound' _ ShowT = ShowT
+-- comm2Bound' _ Home = Home
+-- comm2Bound' _ e@(PrintStr _) = e
+-- comm2Bound' _ Skip = Skip
+comm2Bound' _ c = c
 
 -- expUnbound :: [Exp] -> Exp -> Exp
 -- expUnbound _ (Num n) = Num n

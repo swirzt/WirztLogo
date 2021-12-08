@@ -92,7 +92,7 @@ eval e (IfC eb xs ys) = do
     else evalList e ys
 -- Asumo que ya se bindió antes de evaluar
 eval _ (Def name ns cs) = newComm name (length ns) cs
-eval _ (Save str expp) = newVar str expp
+eval e (Save str expp) = replace e expp >>= newVar str
 eval e (For _ initt end xs) = forLoop e initt end xs (+ 1)
 eval e (ForDelta _ initt end delta xs) = do
   delt <- runExp e delta
@@ -136,6 +136,36 @@ binary e x y f = do
 bool2Float :: MonadLogo m => Bool -> m Float
 bool2Float True = return 1
 bool2Float False = return 0
+
+binaryReplace :: MonadLogo m => [Exp] -> Exp -> Exp -> (Exp -> Exp -> g) -> m g
+binaryReplace e e1 e2 f = do
+  ee1 <- replace e e1
+  ee2 <- replace e e2
+  return $ f ee1 ee2
+
+replace :: MonadLogo m => [Exp] -> Exp -> m Exp
+replace e (Towards e1 e2) = binaryReplace e e1 e2 Towards
+replace e (Var n) = getVar n >>= replace e
+replace e (Sum x y) = binaryReplace e x y Sum
+replace e (Difference x y) = binaryReplace e x y Difference
+replace e (Multiply x y) = binaryReplace e x y Multiply
+replace e (Divide x y) = binaryReplace e x y Divide
+replace e (IfE eb et ef) = do
+  eeb <- replace e eb
+  eet <- replace e et
+  eef <- replace e ef
+  return $ IfE eeb eet eef
+-- replace e (Access i) = replace e $ e !! i
+replace e (Gt e1 e2) = binaryReplace e e1 e2 Gt
+replace e (Lt e1 e2) = binaryReplace e e1 e2 Lt
+replace e (Eq e1 e2) = binaryReplace e e1 e2 Eq
+replace e (GEq e1 e2) = binaryReplace e e1 e2 GEq
+replace e (LEq e1 e2) = binaryReplace e e1 e2 LEq
+replace e (Diff e1 e2) = binaryReplace e e1 e2 Diff
+replace e (And e1 e2) = binaryReplace e e1 e2 And
+replace e (Or e1 e2) = binaryReplace e e1 e2 Or
+replace e (Not expp) = replace e expp >>= return . Not
+replace _ t = return t
 
 runExp :: MonadLogo m => [Exp] -> Exp -> m Float
 runExp _ (Num n) = return n

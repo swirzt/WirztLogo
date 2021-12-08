@@ -13,9 +13,8 @@ data Env = Env
     color :: Color, -- Color del lápiz
     pics :: [Picture], -- Imagenes ya calculadas en el entorno
     vars :: Map String Exp, -- Almacena las definiciones de Variables en el entorno
-    comms :: Map String (Int, [Comm]), -- Almacena las definiciones de Comandos en el entorno
-    dis :: Display --
+    comms :: Map String (Int, [Comm]) -- Almacena las definiciones de Comandos en el entorno
   }
 
-defaultEnv :: Display -> Env
-defaultEnv d = Env 0 0 0 True False black [] empty empty d
+defaultEnv :: Env
+defaultEnv = Env 0 0 0 True False black [] empty empty
