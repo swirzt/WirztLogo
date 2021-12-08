@@ -31,6 +31,9 @@ getLogo = liftIO $ getLine
 printLogo :: MonadLogo m => String -> m ()
 printLogo = liftIO . putStrLn
 
+getInput :: MonadLogo m => String -> m String
+getInput i = (liftIO $ putStr i) >> getLogo
+
 printGraph :: MonadLogo m => m ()
 printGraph = do
   Env x y ang b _ _ pics _ _ d <- get

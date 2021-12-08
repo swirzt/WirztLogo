@@ -23,7 +23,8 @@ defaultWindow :: Display
 defaultWindow = makeWindow defaultHW defaultHW
 
 run :: Display -> IO ()
-run d = runLogo d white (runInputT defaultSettings (repl)) >> return ()
+-- run d = runLogo d (runInputT defaultSettings (repl)) >> return ()
+run d = runLogo d repl >> return ()
 
 main :: IO ()
 main = do
@@ -40,21 +41,26 @@ main = do
 inp :: String
 inp = ">> "
 
-repl :: (MonadLogo m, MonadMask m) => InputT m ()
+repl :: MonadLogo m => m ()
 repl = do
-  minput <- getInputLine inp
+  minput <- getInput inp
   case minput of
-    Nothing -> return ()
-    Just "" -> repl
-    Just x -> do
-      let cms = parser x
-      liftIO $ putStrLn $ show cms
-      --  printLogo $ show cms
-      repl
+    "" -> repl
+    _ -> case parserComm minput of
+      Nothing -> repl
+      Just cms -> (printLogo $ show cms) >> evalinteractivo cms >> repl
 
--- lift $ lift $ catchErrors $ evalinteractivo $ parser x
--- >> repl
+-- repl :: (MonadLogo m, MonadMask m) => InputT m ()
+-- repl = do
+--   minput <- getInputLine inp
+--   case minput of
+--     Nothing -> return ()
+--     Just "" -> repl
+--     Just x -> do
+--       case parserComm x of
+--         Nothing -> repl
+--         Just cms -> (liftIO $ putStrLn $ show cms) >> evalinteractivo cms >> repl
 
 evalinteractivo :: MonadLogo m => [Comm] -> m ()
 evalinteractivo [] = printGraph >> return ()
-evalinteractivo (x : xs) = printGraph >> eval x >> evalinteractivo xs
+evalinteractivo (x : xs) = printGraph >> eval [] x >> evalinteractivo xs
