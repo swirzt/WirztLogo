@@ -10,7 +10,6 @@ import Common
 import Control.Concurrent
 import Control.Monad.Except
 import Control.Monad.State
-import Control.Monad.Writer
 import qualified Data.Map as M
 import GlobalEnv
 import Graphics.Gloss
@@ -36,13 +35,13 @@ getInput i = (liftIO $ putStr i) >> getLogo
 
 printGraph :: MonadLogo m => m ()
 printGraph = do
-  Env x y ang b _ _ pics _ _ d <- get
+  Env x y ang b _ _ pic _ _ d <- get
   let tortu = getTortu x y ang
       paraPrint =
         if b
-          then tortu : pics
-          else pics
-  liftIO $ display d white (pictures pics)
+          then tortu : pic
+          else pic
+  liftIO $ display d white (pictures paraPrint)
 
 getData :: MonadLogo m => (Env -> a) -> m a
 getData f = get >>= return . f

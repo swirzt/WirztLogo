@@ -1,7 +1,5 @@
 module Common where
 
-import Graphics.Gloss
-
 -- Considero los booleanos como el lenguaje C
 -- Exp -> Float
 data Exp

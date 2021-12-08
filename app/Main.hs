@@ -1,15 +1,15 @@
 module Main where
 
 import Common
-import Control.Monad
-import Control.Monad.Catch (MonadMask)
-import Control.Monad.IO.Class
+-- import Control.Monad
+-- import Control.Monad.Catch (MonadMask)
+-- import Control.Monad.IO.Class
 import Eval
 import Graphics.Gloss
 import Lib
-import LogoPar
+-- import LogoPar
 import MonadLogo
-import System.Console.Haskeline (InputT, defaultSettings, getInputLine, runInputT)
+-- import System.Console.Haskeline (InputT, defaultSettings, getInputLine, runInputT)
 import System.Environment
 import Text.Read
 
@@ -31,7 +31,7 @@ main = do
   args <- getArgs
   case args of
     [] -> run defaultWindow
-    (h : w : args) -> case readMaybe h >>= \hi -> readMaybe w >>= \wi -> return $ makeWindow hi wi of
+    (h : w : _) -> case readMaybe h >>= \hi -> readMaybe w >>= \wi -> return $ makeWindow hi wi of
       Just d -> run d
       Nothing -> do
         putStrLn "Uno o ambos argumentos son inválidos\nUtilizando las medidas default"
