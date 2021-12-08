@@ -18,6 +18,7 @@ import Common
 -- import Control.Monad (ap)
 import Data.List
 import Graphics.Gloss
+import Graphics.Gloss.Geometry.Angle
 import LogoPar
 
 -- (.*) :: (c -> d) -> (a -> b -> c) -> (a -> b -> d)
@@ -194,25 +195,19 @@ dospi :: Float
 dospi = 2 * pi
 
 grad2radian :: Float -> Float
-grad2radian n = n / 180 * pi
+grad2radian = degToRad
 
 radian2grad :: Float -> Float
-radian2grad n = n * 180 / pi
+radian2grad = radToDeg
 
-repeatUntil :: (a -> Bool) -> (a -> a) -> a -> a
-repeatUntil c f x
-  | c x = x
-  | otherwise = repeatUntil c f (f x)
+-- repeatUntil :: (a -> Bool) -> (a -> a) -> a -> a
+-- repeatUntil c f x
+--   | c x = x
+--   | otherwise = repeatUntil c f (f x)
 
 -- Mantiene el ángulo entre 0 y 2pi
 normalize :: Float -> Float
-normalize n =
-  if n < 0
-    then repeatUntil (0 <=) (+ dospi) n
-    else
-      if n > dospi
-        then repeatUntil (dospi >=) (\x -> x - dospi) n
-        else n
+normalize = normalizeAngle
 
 rect :: Float -> Float -> Picture
 rect x y = polygon $ rectanglePath x y
