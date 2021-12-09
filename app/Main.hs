@@ -1,6 +1,6 @@
 module Main where
 
-import Common (Comm)
+import Common
 -- import Control.Monad
 -- import Control.Monad.Catch (MonadMask)
 -- import Control.Monad.IO.Class
@@ -13,6 +13,7 @@ import GlobalEnv
 import Graphics.Gloss
 import Graphics.Gloss.Interface.IO.Animate
 import Graphics.Gloss.Interface.IO.Display (Controller (controllerSetRedraw))
+import Graphics.Gloss.Interface.IO.Game (playIO)
 import Graphics.Gloss.Interface.IO.Interact (Controller (controllerSetRedraw))
 import Graphics.Gloss.Interface.IO.Simulate (ViewPort, simulateIO)
 import Lib
@@ -37,7 +38,7 @@ defaultWindow :: Display
 defaultWindow = makeWindow defaultHW defaultHW
 
 runProgram :: Display -> IO ()
-runProgram d = simulateIO d white 1000 defaultEnv env2Pic step
+runProgram d = simulateIO d white 10 defaultEnv env2Pic step
 
 env2Pic :: Env -> IO Picture
 env2Pic e =
@@ -54,15 +55,12 @@ env2Pic e =
 
 step :: ViewPort -> Float -> Env -> IO Env
 step v f e = do
-  minput <- runInputT defaultSettings getInp
+  minput <- getLine
   case minput of
     "" -> step v f e
     _ -> case parserComm minput of
-      Nothing -> step v f e
+      Nothing -> print "no parse" >> step v f e
       Just cms -> evalPrint e cms
-  where
-    getInp :: InputT IO String
-    getInp = getInputLine inp >>= maybe (return "") return
 
 evalPrint :: Env -> [Comm] -> IO Env
 evalPrint e xs = do

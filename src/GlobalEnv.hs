@@ -3,6 +3,7 @@ module GlobalEnv where
 import Common
 import Data.Map (Map, empty)
 import Graphics.Gloss
+import Relude (Show)
 
 data Env = Env
   { posx :: Float, -- Representa la posición x de la tortuga
@@ -15,6 +16,7 @@ data Env = Env
     vars :: Map String Exp, -- Almacena las definiciones de Variables en el entorno
     comms :: Map String (Int, [Comm]) -- Almacena las definiciones de Comandos en el entorno
   }
+  deriving (Show)
 
 defaultEnv :: Env
 defaultEnv = Env 0 0 0 True False black [] empty empty
