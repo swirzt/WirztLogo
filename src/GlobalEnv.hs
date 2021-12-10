@@ -3,7 +3,6 @@ module GlobalEnv where
 import Common
 import Data.Map (Map, empty)
 import Graphics.Gloss
-import Relude (Show)
 
 data Env = Env
   { posx :: Float, -- Representa la posición x de la tortuga

@@ -13,9 +13,7 @@ import Control.Monad.State
 import qualified Data.Map as M
 import GlobalEnv
 import Graphics.Gloss
-import Graphics.Gloss.Interface.IO.Animate
 import Lib
-import System.IO
 
 class (MonadIO m, MonadState Env m, MonadError String m) => MonadLogo m
 

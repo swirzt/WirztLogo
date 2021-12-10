@@ -29,6 +29,8 @@ dependencies:
 - haskeline
 - exceptions
 - relude
+- simple-get-opt
+- filepath
 
 library:
   source-dirs: src

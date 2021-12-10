@@ -1,0 +1,12 @@
+repeat 4 [fd 100 rt 90]
+seth 180
+setcolor 5
+fd 100
+rt 90
+setcolor 6
+fd 100
+setcolor 7
+home
+seth 0
+setcolor 14
+make "x 1 repeat 200 [fd :x rt 89 make "x :x + 1]

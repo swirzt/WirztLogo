@@ -1,47 +1,28 @@
 module Main where
 
-import Common
--- import Control.Monad
--- import Control.Monad.Catch (MonadMask)
--- import Control.Monad.IO.Class
-
--- import LogoPar
-
-import Control.Monad
+import Common (Comm)
+import Control.Exception (IOException, catch)
+import Data.Char
 import Eval (eval)
 import GlobalEnv
 import Graphics.Gloss
-import Graphics.Gloss.Interface.IO.Animate
-import Graphics.Gloss.Interface.IO.Display (Controller (controllerSetRedraw))
-import Graphics.Gloss.Interface.IO.Game (playIO)
-import Graphics.Gloss.Interface.IO.Interact (Controller (controllerSetRedraw))
 import Graphics.Gloss.Interface.IO.Simulate (ViewPort, simulateIO)
 import Lib
 import MonadLogo
   ( MonadLogo,
-    getInput,
-    printLogo,
     runLogo,
     runLogo',
   )
-import System.Console.Haskeline
+import SimpleGetOpt
 import System.Environment
+-- import System.FilePath.Windows (replaceExtension)
 import Text.Read (readMaybe)
-
-defaultHW :: Int
-defaultHW = 300
 
 makeWindow :: Int -> Int -> Display
 makeWindow h w = InWindow "LOGO" (h, w) (0, 0)
 
-defaultWindow :: Display
-defaultWindow = makeWindow defaultHW defaultHW
-
-runProgram :: Display -> IO ()
-runProgram d = simulateIO d white 10 defaultEnv env2Pic step
-
-env2Pic :: Env -> IO Picture
-env2Pic e =
+env2Pic :: (a, b, Env) -> IO Picture
+env2Pic (_, _, e) =
   let x = posx e
       y = posy e
       d = dir e
@@ -49,18 +30,24 @@ env2Pic e =
       picc = pics e
       piccc =
         if b
-          then getTortu x y d : picc
+          then reverse $ getTortu x y d : picc
           else picc
-   in return $ pictures piccc
+   in return (scale 5 5 $ pictures piccc)
 
-step :: ViewPort -> Float -> Env -> IO Env
-step v f e = do
+getComm :: Env -> IO (Float, Maybe [([Exp], Comm)], Env)
+getComm = do
   minput <- getLine
   case minput of
-    "" -> step v f e
+    "" -> return (0, e)
     _ -> case parserComm minput of
-      Nothing -> print "no parse" >> step v f e
-      Just cms -> evalPrint e cms
+      Nothing -> print "no parse" >> return (0, Nothing, e)
+      Just cms -> 
+
+step :: a -> Float -> (Float, Maybe [([Exp], Comm)], Env) -> IO (Float, Maybe [([Exp], Comm)], Env)
+step _ f (fe, Nothing, e)
+  | fe < 2 = return (fe + f, Nothing, e)
+  | otherwise = getComm e
+step _ _ (fe, Just)
 
 evalPrint :: Env -> [Comm] -> IO Env
 evalPrint e xs = do
@@ -69,17 +56,73 @@ evalPrint e xs = do
     Left s -> putStrLn s >> return defaultEnv
     Right (_, e') -> return e'
 
+data Argumentos = Argumentos
+  { fullscreen :: Bool,
+    width :: Int,
+    height :: Int,
+    files :: [FilePath]
+  }
+  deriving (Show)
+
+options :: OptSpec Argumentos
+options =
+  OptSpec
+    { progDefaults = Argumentos False 300 300 [],
+      progOptions =
+        [ Option
+            ['f']
+            ["fullscreen"]
+            "Muestra la ventana gráfica en pantalla completa."
+            $ NoArg $ \s -> Right s {fullscreen = True},
+          Option
+            ['h']
+            ["height"]
+            "Define la altura de la ventana gráfica si se muestra en ventana."
+            $ ReqArg "NUM" $ \a s ->
+              case readMaybe a of
+                Just n | n > 0 -> Right s {height = n}
+                _ -> Left "Valor inválido para 'height'",
+          Option
+            ['w']
+            ["width"]
+            "Define el ancho de la ventana gráfica si se muestra en ventana."
+            $ ReqArg "NUM" $ \a s ->
+              case readMaybe a of
+                Just n | n > 0 -> Right s {width = n}
+                _ -> Left "Valor inválido para 'width'"
+        ],
+      progParamDocs =
+        [("FILES", "Los archivos que se quieran evaluar.")],
+      progParams = \p s -> Right s {files = p : files s}
+    }
+
 main :: IO ()
 main = do
-  args <- getArgs
-  case args of
-    [] -> runProgram defaultWindow
-    (h : w : _) -> case readMaybe h >>= \hi -> readMaybe w >>= \wi -> return $ makeWindow hi wi of
-      Just d -> runProgram d
-      Nothing -> do
-        putStrLn "Uno o ambos argumentos son inválidos\nUtilizando las medidas default"
-        runProgram defaultWindow
-    _ -> putStrLn "Numero incorrecto de argumentos"
+  args <- getOpts options
+  let d = case args of
+        Argumentos True _ _ _ -> FullScreen
+        Argumentos False w h _ -> makeWindow h w
+  runProgram d (files args)
+
+getFile :: FilePath -> IO String
+getFile f =
+  let fname = takeWhile (not . isSpace) f
+   in catch
+        (readFile fname)
+        ( \e -> do
+            let error = Prelude.show (e :: IOException)
+            putStrLn ("No se pudo abrir el archivo: " ++ error)
+            return ""
+        )
+
+runProgram :: Display -> [FilePath] -> IO ()
+runProgram d fs =
+  mapM getFile fs >>= \s -> case parserComm $ concat s of
+    Nothing -> print "Parse error en archivos"
+    Just cms ->
+      runLogo (evalinteractivo cms) >>= \x -> case x of
+        Left str -> print str
+        Right (_, e) -> simulateIO d white 60 (0, e) env2Pic step
 
 inp :: String
 inp = ">> "

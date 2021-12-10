@@ -42,6 +42,7 @@ packages:
 #
 extra-deps:
 - random-1.2.1@sha256:8bee24dc0c985a90ee78d94c61f8aed21c49633686f0f1c14c5078d818ee43a2,6598
+- simple-get-opt-0.4@sha256:0ba4d32f64b26d30f6182a3fcd88c71d71622035152e726de41e9a46d945b09f,765
 
 # Override default flag values for local packages and extra-deps
 # flags: {}

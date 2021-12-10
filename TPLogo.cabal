@@ -27,6 +27,7 @@ source-repository head
 library
   exposed-modules:
       Common
+      Either3
       Eval
       GlobalEnv
       Lib
@@ -41,11 +42,13 @@ library
     , base >=4.7 && <5
     , containers
     , exceptions
+    , filepath
     , gloss
     , haskeline
     , mtl
     , random >=1.2.1
     , relude
+    , simple-get-opt
   default-language: Haskell2010
 
 executable TPLogo-exe
@@ -61,11 +64,13 @@ executable TPLogo-exe
     , base >=4.7 && <5
     , containers
     , exceptions
+    , filepath
     , gloss
     , haskeline
     , mtl
     , random >=1.2.1
     , relude
+    , simple-get-opt
   default-language: Haskell2010
 
 test-suite TPLogo-test
@@ -82,9 +87,11 @@ test-suite TPLogo-test
     , base >=4.7 && <5
     , containers
     , exceptions
+    , filepath
     , gloss
     , haskeline
     , mtl
     , random >=1.2.1
     , relude
+    , simple-get-opt
   default-language: Haskell2010

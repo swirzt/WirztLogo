@@ -2,6 +2,7 @@
 module LogoPar where
 import Common
 import Data.Char
+import Either3
 }
 
 %name logo
@@ -78,9 +79,10 @@ import Data.Char
 
 
 %%
-Par :: { Either Exp [Comm] }
-Par : Exp          { Left $1 }
-    | CommSeq      { Right $1 }
+Par :: { Either3 String Exp [Comm] }
+Par : Exp          { Medio $1 }
+    | CommSeq      { Der $1 }
+    | error        { Izq "Error de parseo" }
 
 CommSeq :: { [Comm] }
 CommSeq : CommSeqR           { reverse $1 }
