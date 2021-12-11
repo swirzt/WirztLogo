@@ -137,6 +137,7 @@ ExpSeq : ExpSeqR          { reverse $1 }
 ExpSeqR :: { [Exp] }
 ExpSeqR : Exp             { [$1] }
         | ExpSeqR Exp     { $2 : $1 }
+        | {- empty -}     { [] }
 
 Exp :: { Exp }
 Exp : num                  { Num $1 }

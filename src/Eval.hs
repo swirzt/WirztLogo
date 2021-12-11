@@ -1,15 +1,16 @@
 module Eval where
 
-import Common
--- import Data.Char
-import GHC.Float.RealFracMethods
--- import GlobalEnv
-import Graphics.Gloss
-import Lib
+import Common (Comm (..), Exp (..))
+import Data.Functor ((<&>))
+import GHC.Float.RealFracMethods (floorFloatInt)
+import Graphics.Gloss (line)
+import Lib (comm2Bound, grad2radian, parserExp, radian2grad)
 import MonadLogo
-import Relude.List
+import Relude.List ((!!?))
 
-moveTo :: MonadLogo m => Float -> Float -> m (Maybe [([Exp], Comm)])
+type EvalRet = Maybe [([Exp], Comm)]
+
+moveTo :: MonadLogo m => Float -> Float -> m EvalRet
 moveTo x y = do
   xc <- getX
   yc <- getY
@@ -20,7 +21,7 @@ moveTo x y = do
   setY y
   noth
 
-moveLine :: MonadLogo m => [Exp] -> Exp -> (Float -> Float -> Float) -> m (Maybe [([Exp], Comm)])
+moveLine :: MonadLogo m => [Exp] -> Exp -> (Float -> Float -> Float) -> m EvalRet
 moveLine e expp f = do
   n <- runExp e expp
   x <- getX
@@ -30,21 +31,20 @@ moveLine e expp f = do
       y' = f y (cos a * n)
   moveTo x' y'
 
-setTo :: MonadLogo m => m Float -> m Float -> m (Maybe [([Exp], Comm)])
+setTo :: MonadLogo m => m Float -> m Float -> m EvalRet
 setTo f g = do
   x <- f
   y <- g
   moveTo x y
 
-modDir :: MonadLogo m => [Exp] -> Exp -> (Float -> m ()) -> m (Maybe [([Exp], Comm)])
+modDir :: MonadLogo m => [Exp] -> Exp -> (Float -> m ()) -> m EvalRet
 modDir e expp f = do
   n <- runExp e expp
   let radN = grad2radian n
-  printLogo (show radN)
   f radN
   noth
 
-repeatComm :: MonadLogo m => [Exp] -> Exp -> [Comm] -> m (Maybe [([Exp], Comm)])
+repeatComm :: MonadLogo m => [Exp] -> Exp -> [Comm] -> m EvalRet
 repeatComm e expp com = do
   n <- runExp e expp
   let ni = floorFloatInt n
@@ -58,7 +58,7 @@ conEnd ys x = foldr (:) [x] ys
 mapCom :: [Exp] -> [Comm] -> Maybe [([Exp], Comm)]
 mapCom e = return . map (\c -> (e, c))
 
-repeatComm' :: MonadLogo m => [Exp] -> Int -> [Comm] -> m (Maybe [([Exp], Comm)])
+repeatComm' :: MonadLogo m => [Exp] -> Int -> [Comm] -> m EvalRet
 repeatComm' _ 0 _ = noth
 repeatComm' e n com =
   let fN = fromIntegral (n - 1)
@@ -69,10 +69,10 @@ repeatComm' e n com =
 ifF :: Float -> Bool
 ifF = (/= 0)
 
-noth :: MonadLogo m => m (Maybe [([Exp], Comm)])
+noth :: MonadLogo m => m EvalRet
 noth = return Nothing
 
-eval :: MonadLogo m => [Exp] -> Comm -> m (Maybe [([Exp], Comm)])
+eval :: MonadLogo m => [Exp] -> Comm -> m EvalRet
 eval e (Ford expp) = moveLine e expp (+)
 eval e (Back expp) = moveLine e expp (-)
 eval e (TRight expp) = modDir e expp (changeDir (+))
@@ -102,42 +102,38 @@ eval e (IfC eb xs ys) = do
   if ifF b
     then return $ mapCom e xs
     else return $ mapCom e ys
--- Asumo que ya se bindió antes de evaluar
-eval _ (Def name ns cs) = newComm name (length ns) cs
-eval e (Save str expp) = replace e expp >>= newVar str
-eval e (For _ initt end xs) = forLoop e initt end xs (+ 1)
-eval e (ForDelta _ initt end delta xs) = do
-  delt <- runExp e delta
-  forLoop e initt end xs (+ delt)
-eval e (Wait expp) = runExp e expp >>= wait . floorFloatInt
-eval e (While expp cs) = do
+eval _ (Def name ns cs) = newComm name (length ns) (map (comm2Bound ns) cs) >> noth
+eval e (Save str expp) = replace e expp >>= newVar str >> noth
+eval e (For str initt end xs) = forLoop e initt end xs (+ 1) (\e1 e2 -> For str e1 e2 xs)
+eval e (ForDelta str initt end delta xs) = do
+  fdelta <- runExp e delta
+  forLoop e initt end xs (+ fdelta) (\e1 e2 -> ForDelta str e1 e2 (Num fdelta) xs)
+eval e (Wait expp) = runExp e expp >>= wait . floorFloatInt >> noth
+eval e c@(While expp cs) = do
   b <- runExp e expp
   if ifF b
-    then evalList e cs >> eval e (While expp cs)
-    else nada
-eval e (DoWhile cs expp) = do
-  evalList e cs
-  b <- runExp e expp
-  if ifF b
-    then eval e (DoWhile cs expp)
-    else nada
+    then return $ fmap (++ [(e, c)]) (mapCom e cs)
+    else noth
+eval e (DoWhile cs expp) =
+  let newWhile = While expp cs
+   in return $ fmap (++ [(e, newWhile)]) (mapCom e cs)
 eval e (CommVar str es) = do
   (n, com) <- getComm str
   if n /= length es
     then failLogo $ "La cantidad de argumentos que recibe la función: " ++ str ++ " es incorrecta."
-    else evalList (es ++ e) com
-eval _ Skip = nada
+    else return $ mapCom (es ++ e) com
+eval _ Skip = noth
 
-forLoop :: MonadLogo m => [Exp] -> Exp -> Exp -> [Comm] -> (Float -> Float) -> m ()
-forLoop e e1 e2 cs f = do
+forLoop :: MonadLogo m => [Exp] -> Exp -> Exp -> [Comm] -> (Float -> Float) -> (Exp -> Exp -> Comm) -> m EvalRet
+forLoop e e1 e2 cs f g = do
   ee1 <- runExp e e1
   ee2 <- runExp e e2
-  forLoop' e ee1 ee2 cs f
-
-forLoop' :: MonadLogo m => [Exp] -> Float -> Float -> [Comm] -> (Float -> Float) -> m ()
-forLoop' e i n cs f
-  | i < n = evalList (Num i : e) cs >> forLoop' e (f i) n cs f
-  | otherwise = nada
+  if ee1 <= ee2
+    then
+      let newComm = g (Num (f ee1)) (Num ee2) -- Lo hago así para no recalcular
+          ys = mapCom (e1 : e) cs
+       in return $ fmap (++ [(e, newComm)]) ys
+    else noth
 
 binary :: MonadLogo m => [Exp] -> Exp -> Exp -> (Float -> Float -> a) -> m a
 binary e x y f = do
@@ -176,14 +172,14 @@ replace e (LEq e1 e2) = binaryReplace e e1 e2 LEq
 replace e (Diff e1 e2) = binaryReplace e e1 e2 Diff
 replace e (And e1 e2) = binaryReplace e e1 e2 And
 replace e (Or e1 e2) = binaryReplace e e1 e2 Or
-replace e (Not expp) = replace e expp Data.Functor.<&> Not
+replace e (Not expp) = replace e expp <&> Not
 replace _ t = return t
 
 runExp :: MonadLogo m => [Exp] -> Exp -> m Float
 runExp _ (Num n) = return n
 runExp _ XCor = getX
 runExp _ YCor = getY
-runExp _ Heading = getDir Data.Functor.<&> radian2grad
+runExp _ Heading = getDir <&> radian2grad
 runExp _ (Towards _ _) =
   return 0 -- Temporal, no se resolverlo
 runExp e (Var name) = getVar name >>= runExp e

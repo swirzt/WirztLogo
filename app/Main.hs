@@ -1,27 +1,47 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Main where
 
-import Common (Comm)
+import Common (Comm, Exp)
+import Control.Concurrent (forkIO)
 import Control.Exception (IOException, catch)
-import Data.Char
+import Control.Monad (forever)
+import Control.Monad.IO.Class (MonadIO (liftIO))
+import qualified Data.Bifunctor as B
+import Data.Char (isSpace)
+import Data.IORef (IORef, atomicWriteIORef, newIORef, readIORef)
 import Eval (eval)
-import GlobalEnv
+import GlobalEnv (Env (dir, pics, posx, posy, show), defaultEnv)
 import Graphics.Gloss
-import Graphics.Gloss.Interface.IO.Simulate (ViewPort, simulateIO)
-import Lib
+  ( Display (..),
+    Picture,
+    pictures,
+    scale,
+    white,
+  )
+import Graphics.Gloss.Interface.IO.Simulate (simulateIO)
+import Lib (comm2Bound, getTortu, parserComm)
 import MonadLogo
   ( MonadLogo,
     runLogo,
     runLogo',
   )
 import SimpleGetOpt
-import System.Environment
--- import System.FilePath.Windows (replaceExtension)
+  ( ArgDescr (NoArg, ReqArg),
+    OptDescr (Option),
+    OptSpec (..),
+    getOpts,
+  )
+import System.Console.Haskeline (InputT, defaultSettings, getInputLine, runInputT)
+import System.Exit (exitSuccess)
 import Text.Read (readMaybe)
 
 makeWindow :: Int -> Int -> Display
-makeWindow h w = InWindow "LOGO" (h, w) (0, 0)
+makeWindow w h = InWindow "LOGO" (w, h) (0, 0)
 
-env2Pic :: (a, b, Env) -> IO Picture
+type Model = (IORef String, Maybe [([Exp], Comm)], Env)
+
+env2Pic :: Model -> IO Picture
 env2Pic (_, _, e) =
   let x = posx e
       y = posy e
@@ -34,32 +54,32 @@ env2Pic (_, _, e) =
           else picc
    in return (scale 5 5 $ pictures piccc)
 
-getComm :: Env -> IO (Float, Maybe [([Exp], Comm)], Env)
-getComm = do
-  minput <- getLine
-  case minput of
-    "" -> return (0, e)
-    _ -> case parserComm minput of
-      Nothing -> print "no parse" >> return (0, Nothing, e)
-      Just cms -> 
+evalStepComm :: IORef String -> Env -> [([Exp], Comm)] -> IO Model
+evalStepComm _ _ [] = undefined -- No debería llegar a acá
+evalStepComm ref e ((ex, x) : xs) =
+  runLogo' e (eval ex x) >>= \case
+    Left str -> putStrLn str >> return (ref, Nothing, e) -- Que hacer en caso de error?
+    Right (mayComm, e') -> let retComm = maybe xs (++ xs) mayComm in return (ref, Just retComm, e')
 
-step :: a -> Float -> (Float, Maybe [([Exp], Comm)], Env) -> IO (Float, Maybe [([Exp], Comm)], Env)
-step _ f (fe, Nothing, e)
-  | fe < 2 = return (fe + f, Nothing, e)
-  | otherwise = getComm e
-step _ _ (fe, Just)
-
-evalPrint :: Env -> [Comm] -> IO Env
-evalPrint e xs = do
-  r <- runLogo' e (evalinteractivo xs)
-  case r of
-    Left s -> putStrLn s >> return defaultEnv
-    Right (_, e') -> return e'
+step :: a -> b -> Model -> IO Model
+step _ f m@(ref, Nothing, e) = do
+  input <- readIORef ref
+  case input of
+    "" -> return m
+    ":q" -> exitSuccess -- Todo el programa termina
+    _ ->
+      atomicWriteIORef ref "" >> case parserComm input of
+        Nothing -> print "no parse" >> return m
+        Just [] -> return m
+        Just xs -> evalStepComm ref e $ map (\c -> ([], c)) xs
+step _ _ (ref, Just [], e) = return (ref, Nothing, e)
+step _ _ (ref, Just xs, e) = evalStepComm ref e xs
 
 data Argumentos = Argumentos
   { fullscreen :: Bool,
     width :: Int,
     height :: Int,
+    refresh :: Int,
     files :: [FilePath]
   }
   deriving (Show)
@@ -67,7 +87,7 @@ data Argumentos = Argumentos
 options :: OptSpec Argumentos
 options =
   OptSpec
-    { progDefaults = Argumentos False 300 300 [],
+    { progDefaults = Argumentos False 300 300 60 [],
       progOptions =
         [ Option
             ['f']
@@ -89,7 +109,15 @@ options =
             $ ReqArg "NUM" $ \a s ->
               case readMaybe a of
                 Just n | n > 0 -> Right s {width = n}
-                _ -> Left "Valor inválido para 'width'"
+                _ -> Left "Valor inválido para 'width'",
+          Option
+            ['r']
+            ["refresh"]
+            "Define la velocidad de refresco del dibujo, por defecto es 60."
+            $ ReqArg "NUM" $ \a s ->
+              case readMaybe a of
+                Just n | n > 0 -> Right s {refresh = n}
+                _ -> Left "Valor inválido para 'refresh'"
         ],
       progParamDocs =
         [("FILES", "Los archivos que se quieran evaluar.")],
@@ -100,9 +128,10 @@ main :: IO ()
 main = do
   args <- getOpts options
   let d = case args of
-        Argumentos True _ _ _ -> FullScreen
-        Argumentos False w h _ -> makeWindow h w
-  runProgram d (files args)
+        Argumentos True _ _ _ _ -> FullScreen
+        Argumentos False w h _ _ -> makeWindow w h
+  ref <- newIORef ""
+  runProgram d (files args) ref (refresh args)
 
 getFile :: FilePath -> IO String
 getFile f =
@@ -115,17 +144,36 @@ getFile f =
             return ""
         )
 
-runProgram :: Display -> [FilePath] -> IO ()
-runProgram d fs =
-  mapM getFile fs >>= \s -> case parserComm $ concat s of
-    Nothing -> print "Parse error en archivos"
-    Just cms ->
-      runLogo (evalinteractivo cms) >>= \x -> case x of
-        Left str -> print str
-        Right (_, e) -> simulateIO d white 60 (0, e) env2Pic step
-
 inp :: String
 inp = ">> "
 
-evalinteractivo :: MonadLogo m => [Comm] -> m ()
-evalinteractivo = foldr ((>>) . eval []) (return ())
+consola :: IORef String -> InputT IO ()
+consola ref = do
+  input <- getInputLine inp
+  case input of
+    Nothing -> liftIO (atomicWriteIORef ref ":q")
+    Just "" -> consola ref
+    Just ":q" -> liftIO (atomicWriteIORef ref ":q") -- La diferencia es que no hace loop
+    Just x -> liftIO (atomicWriteIORef ref x) >> consola ref
+
+hiloConsola :: IORef String -> IO ()
+hiloConsola ref = runInputT defaultSettings (consola ref)
+
+runProgram :: Display -> [FilePath] -> IORef String -> Int -> IO ()
+runProgram d fs ref r =
+  mapM getFile fs >>= \s -> case parserComm $ concat s of
+    Nothing -> print "Parse error en archivos" >> forkRun d Nothing defaultEnv ref r
+    Just cms ->
+      let cms' = map (comm2Bound []) cms
+       in eval1st cms' >>= \case
+            Left str -> print str
+            Right (m, e) -> forkRun d m e ref r
+
+forkRun :: Display -> Maybe [([Exp], Comm)] -> Env -> IORef String -> Int -> IO ()
+forkRun d m e ref refresh = forkIO (hiloConsola ref) >> simulateIO d white refresh (ref, m, e) env2Pic step
+
+eval1st :: [Comm] -> IO (Either String (Maybe [([Exp], Comm)], Env))
+eval1st [] = return $ return (Nothing, defaultEnv)
+eval1st (x : xs) =
+  let ys = map (\c -> ([], c)) xs
+   in runLogo' defaultEnv (eval [] x) >>= \zs -> return $ fmap (B.first (fmap (++ ys))) zs
