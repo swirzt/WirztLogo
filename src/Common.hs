@@ -9,26 +9,17 @@ data Exp
   | Heading
   | Towards Exp Exp
   | Var String
-  | Sum Exp Exp
-  | Difference Exp Exp
-  | Multiply Exp Exp
-  | Divide Exp Exp
+  | BinaryOp (Float -> Float -> Float) Exp Exp
   | Read
   | IfE Exp Exp Exp
   | Access Int -- Solo usado dentro de definiciones TO y For
   -- Sección de bool
-  | Gt Exp Exp
-  | Lt Exp Exp
-  | Eq Exp Exp
-  | GEq Exp Exp
-  | LEq Exp Exp
-  | Diff Exp Exp
+  | Compare (Float -> Float -> Bool) Exp Exp
   | And Exp Exp
   | Or Exp Exp
   | Not Exp
   | T
   | F
-  deriving (Show)
 
 data Comm
   = Ford Exp
@@ -60,4 +51,3 @@ data Comm
   | DoWhile [Comm] Exp
   | CommVar String [Exp]
   | Skip -- Comando que no hace nada
-  deriving (Show)

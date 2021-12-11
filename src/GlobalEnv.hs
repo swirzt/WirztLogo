@@ -16,7 +16,6 @@ data Env = Env
     comms :: Map String (Int, [Comm]), -- Almacena las definiciones de Comandos en el entorno
     escala :: Float -- Cuanto se debe escalar la imagen
   }
-  deriving (Show)
 
 defaultEnv :: Env
 defaultEnv = Env 0 0 0 True False black [] empty empty 5

@@ -130,9 +130,9 @@ forLoop e e1 e2 cs f g = do
   ee2 <- runExp e e2
   if ee1 <= ee2
     then
-      let newComm = g (Num (f ee1)) (Num ee2) -- Lo hago así para no recalcular
+      let newFor = g (Num (f ee1)) (Num ee2) -- Lo hago así para no recalcular
           ys = mapCom (e1 : e) cs
-       in return $ fmap (++ [(e, newComm)]) ys
+       in return $ fmap (++ [(e, newFor)]) ys
     else noth
 
 binary :: MonadLogo m => [Exp] -> Exp -> Exp -> (Float -> Float -> a) -> m a
@@ -154,22 +154,14 @@ binaryReplace e e1 e2 f = do
 replace :: MonadLogo m => [Exp] -> Exp -> m Exp
 replace e (Towards e1 e2) = binaryReplace e e1 e2 Towards
 replace e (Var n) = getVar n >>= replace e
-replace e (Sum x y) = binaryReplace e x y Sum
-replace e (Difference x y) = binaryReplace e x y Difference
-replace e (Multiply x y) = binaryReplace e x y Multiply
-replace e (Divide x y) = binaryReplace e x y Divide
+replace e (BinaryOp f x y) = binaryReplace e x y (BinaryOp f)
 replace e (IfE eb et ef) = do
   eeb <- replace e eb
   eet <- replace e et
   eef <- replace e ef
   return $ IfE eeb eet eef
 -- replace e (Access i) = replace e $ e !! i
-replace e (Gt e1 e2) = binaryReplace e e1 e2 Gt
-replace e (Lt e1 e2) = binaryReplace e e1 e2 Lt
-replace e (Eq e1 e2) = binaryReplace e e1 e2 Eq
-replace e (GEq e1 e2) = binaryReplace e e1 e2 GEq
-replace e (LEq e1 e2) = binaryReplace e e1 e2 LEq
-replace e (Diff e1 e2) = binaryReplace e e1 e2 Diff
+replace e (Compare f e1 e2) = binaryReplace e e1 e2 (Compare f)
 replace e (And e1 e2) = binaryReplace e e1 e2 And
 replace e (Or e1 e2) = binaryReplace e e1 e2 Or
 replace e (Not expp) = replace e expp <&> Not
@@ -183,10 +175,7 @@ runExp _ Heading = getDir <&> radian2grad
 runExp _ (Towards _ _) =
   return 0 -- Temporal, no se resolverlo
 runExp e (Var name) = getVar name >>= runExp e
-runExp e (Sum x y) = binary e x y (+)
-runExp e (Difference x y) = binary e x y (-)
-runExp e (Multiply x y) = binary e x y (*)
-runExp e (Divide x y) = binary e x y (/)
+runExp e (BinaryOp f x y) = binary e x y f
 runExp e Read = do
   printLogo "Ingrese una expresión:\n>>"
   input <- getLogo
@@ -204,12 +193,7 @@ runExp e (IfE eb et ef) = do
 runExp e (Access i) = case e !!? i of
   Just n -> runExp e n
   Nothing -> failLogo "Se accedió a una variable no ligada por el entorno"
-runExp e (Gt e1 e2) = binary e e1 e2 (>) >>= bool2Float
-runExp e (Lt e1 e2) = binary e e1 e2 (<) >>= bool2Float
-runExp e (Eq e1 e2) = binary e e1 e2 (==) >>= bool2Float
-runExp e (GEq e1 e2) = binary e e1 e2 (>=) >>= bool2Float
-runExp e (LEq e1 e2) = binary e e1 e2 (<=) >>= bool2Float
-runExp e (Diff e1 e2) = binary e e1 e2 (/=) >>= bool2Float
+runExp e (Compare f e1 e2) = binary e e1 e2 f >>= bool2Float
 runExp e (And e1 e2) = binary e e1 e2 (\x y -> ifF x && ifF y) >>= bool2Float
 runExp e (Or e1 e2) = binary e e1 e2 (\x y -> ifF x || ifF y) >>= bool2Float
 runExp e (Not expp) = runExp e expp >>= \x -> if ifF x then return 0 else return 1

@@ -51,19 +51,11 @@ unaryOp f v e g = let ee = f v e in g ee
 exp2Bound :: [String] -> Exp -> Exp
 exp2Bound v (Towards x y) = binary2Bound v x y Towards
 exp2Bound v e@(Var str) = maybe e Access $ elemIndex str v
-exp2Bound v (Sum e1 e2) = binary2Bound v e1 e2 Sum
-exp2Bound v (Difference e1 e2) = binary2Bound v e1 e2 Difference
-exp2Bound v (Multiply e1 e2) = binary2Bound v e1 e2 Multiply
-exp2Bound v (Divide e1 e2) = binary2Bound v e1 e2 Divide
+exp2Bound v (BinaryOp f e1 e2) = binary2Bound v e1 e2 (BinaryOp f)
 exp2Bound v (IfE e1 e2 e3) =
   let ee1 = exp2Bound v e1
    in binary2Bound v e2 e3 (IfE ee1)
-exp2Bound v (Gt e1 e2) = binary2Bound v e1 e2 Gt
-exp2Bound v (Lt e1 e2) = binary2Bound v e1 e2 Lt
-exp2Bound v (Eq e1 e2) = binary2Bound v e1 e2 Eq
-exp2Bound v (GEq e1 e2) = binary2Bound v e1 e2 GEq
-exp2Bound v (LEq e1 e2) = binary2Bound v e1 e2 LEq
-exp2Bound v (Diff e1 e2) = binary2Bound v e1 e2 Diff
+exp2Bound v (Compare f e1 e2) = binary2Bound v e1 e2 (Compare f)
 exp2Bound v (And b1 b2) = binary2Bound v b1 b2 And
 exp2Bound v (Or b1 b2) = binary2Bound v b1 b2 Or
 exp2Bound v (Not b) = unary2Bound v b Not

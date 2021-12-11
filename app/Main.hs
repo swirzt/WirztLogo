@@ -5,7 +5,6 @@ module Main where
 import Common (Comm, Exp)
 import Control.Concurrent (forkIO)
 import Control.Exception (IOException, catch)
-import Control.Monad (forever)
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Data.Bifunctor as B
 import Data.Char (isSpace)
@@ -21,11 +20,7 @@ import Graphics.Gloss
   )
 import Graphics.Gloss.Interface.IO.Simulate (simulateIO)
 import Lib (comm2Bound, getTortu, parserComm)
-import MonadLogo
-  ( MonadLogo,
-    runLogo,
-    runLogo',
-  )
+import MonadLogo (runLogo')
 import SimpleGetOpt
   ( ArgDescr (NoArg, ReqArg),
     OptDescr (Option),
@@ -62,7 +57,7 @@ evalStepComm ref e ((ex, x) : xs) =
     Right (mayComm, e') -> let retComm = maybe xs (++ xs) mayComm in return (ref, Just retComm, e')
 
 step :: a -> b -> Model -> IO Model
-step _ f m@(ref, Nothing, e) = do
+step _ _ m@(ref, Nothing, e) = do
   input <- readIORef ref
   case input of
     "" -> return m
@@ -139,8 +134,8 @@ getFile f =
    in catch
         (readFile fname)
         ( \e -> do
-            let error = Prelude.show (e :: IOException)
-            putStrLn ("No se pudo abrir el archivo: " ++ error)
+            let err = Prelude.show (e :: IOException)
+            putStrLn ("No se pudo abrir el archivo: " ++ err)
             return ""
         )
 
@@ -170,7 +165,7 @@ runProgram d fs ref r =
             Right (m, e) -> forkRun d m e ref r
 
 forkRun :: Display -> Maybe [([Exp], Comm)] -> Env -> IORef String -> Int -> IO ()
-forkRun d m e ref refresh = forkIO (hiloConsola ref) >> simulateIO d white refresh (ref, m, e) env2Pic step
+forkRun d m e ref hz = forkIO (hiloConsola ref) >> simulateIO d white hz (ref, m, e) env2Pic step
 
 eval1st :: [Comm] -> IO (Either String (Maybe [([Exp], Comm)], Env))
 eval1st [] = return $ return (Nothing, defaultEnv)

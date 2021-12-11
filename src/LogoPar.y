@@ -146,18 +146,18 @@ Exp : num                  { Num $1 }
     | heading              { Heading }                       
     | towards Exp Exp      { Towards $2 $3 }
     | varE                 { Var $1 }
-    | Exp '+' Exp          { Sum $1 $3 }
-    | Exp '-' Exp          { Difference $1 $3 }
-    | Exp '/' Exp          { Divide $1 $3 }
-    | Exp '*' Exp          { Multiply $1 $3 }
+    | Exp '+' Exp          { BinaryOp (+) $1 $3 }
+    | Exp '-' Exp          { BinaryOp (-) $1 $3 }
+    | Exp '/' Exp          { BinaryOp (/) $1 $3 }
+    | Exp '*' Exp          { BinaryOp (*) $1 $3 }
     | readword             { Read }
     | if Exp Exp Exp       { IfE $2 $3 $4 }
-    | Exp '>' Exp          { Gt $1 $3 }
-    | Exp '<' Exp          { Lt $1 $3 }
-    | Exp '=' Exp          { Eq $1 $3 }
-    | Exp '>=' Exp         { GEq $1 $3 }
-    | Exp '<=' Exp         { LEq $1 $3 }
-    | Exp '!=' Exp         { Diff $1 $3 }
+    | Exp '>' Exp          { Compare (>) $1 $3 }
+    | Exp '<' Exp          { Compare (<) $1 $3 }
+    | Exp '=' Exp          { Compare (==) $1 $3 }
+    | Exp '>=' Exp         { Compare (>=) $1 $3 }
+    | Exp '<=' Exp         { Compare (<=) $1 $3 }
+    | Exp '!=' Exp         { Compare (/=) $1 $3 }
     | Exp '&&' Exp         { And $1 $3 }
     | Exp '||' Exp         { Or $1 $3 }
     | not Exp              { Not $2 }
