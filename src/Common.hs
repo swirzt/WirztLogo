@@ -51,3 +51,7 @@ data Comm
   | DoWhile [Comm] Exp
   | CommVar String [Exp]
   | Skip -- Comando que no hace nada
+
+data Output = Ready | Error String | Show String
+
+data Input = Exit | Input String

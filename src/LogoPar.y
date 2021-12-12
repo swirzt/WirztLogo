@@ -262,7 +262,7 @@ lexNum cs = TokenNum (read num) : lexer' rest
       where (num,rest) = span (\d -> isDigit d || d == '.') cs
 
 lexVar cs =
-  case span isAlphaNum cs of
+  case span (\x -> isAlphaNum x || x == '.') cs of
       ("fordward",rest) -> TokenFd : lexer' rest
       ("fd",rest) -> TokenFd : lexer' rest
       ("back",rest) -> TokenBk : lexer' rest

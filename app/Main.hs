@@ -2,15 +2,16 @@
 
 module Main where
 
-import Common (Comm, Exp)
+import Common
 import Control.Concurrent (forkIO)
+import Control.Concurrent.MVar
 import Control.Exception (IOException, catch)
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Data.Bifunctor as B
 import Data.Char (isSpace)
 import Data.IORef (IORef, atomicWriteIORef, newIORef, readIORef)
 import Eval (eval)
-import GlobalEnv (Env (dir, pics, posx, posy, show), defaultEnv)
+import GlobalEnv (Env (dir, out, pics, posx, posy, show), defaultEnv)
 import Graphics.Gloss
   ( Display (..),
     Picture,
@@ -20,7 +21,7 @@ import Graphics.Gloss
   )
 import Graphics.Gloss.Interface.IO.Simulate (simulateIO)
 import Lib (comm2Bound, getTortu, parserComm)
-import MonadLogo (runLogo')
+import MonadLogo (runLogo)
 import SimpleGetOpt
   ( ArgDescr (NoArg, ReqArg),
     OptDescr (Option),
@@ -34,7 +35,7 @@ import Text.Read (readMaybe)
 makeWindow :: Int -> Int -> Display
 makeWindow w h = InWindow "LOGO" (w, h) (0, 0)
 
-type Model = (IORef String, Maybe [([Exp], Comm)], Env)
+type Model = (MVar Input, Maybe [([Exp], Comm)], Env)
 
 env2Pic :: Model -> IO Picture
 env2Pic (_, _, e) =
@@ -49,26 +50,25 @@ env2Pic (_, _, e) =
           else picc
    in return (scale 5 5 $ pictures piccc)
 
-evalStepComm :: IORef String -> Env -> [([Exp], Comm)] -> IO Model
-evalStepComm _ _ [] = undefined -- No debería llegar a acá
+evalStepComm :: MVar Input -> Env -> [([Exp], Comm)] -> IO Model
+evalStepComm _ _ [] = undefined -- No debería llegar a esto
 evalStepComm ref e ((ex, x) : xs) =
-  runLogo' e (eval ex x) >>= \case
-    Left str -> putStrLn str >> return (ref, Nothing, e) -- Que hacer en caso de error?
+  runLogo e (eval ex x) >>= \case
+    Left str -> putMVar (out e) (Error str) >> return (ref, Nothing, e) -- Que hacer en caso de error?
     Right (mayComm, e') -> let retComm = maybe xs (++ xs) mayComm in return (ref, Just retComm, e')
 
 step :: a -> b -> Model -> IO Model
-step _ _ m@(ref, Nothing, e) = do
-  input <- readIORef ref
+step _ _ m@(i, Nothing, e) = do
+  input <- tryTakeMVar i
   case input of
-    "" -> return m
-    ":q" -> exitSuccess -- Todo el programa termina
-    _ ->
-      atomicWriteIORef ref "" >> case parserComm input of
-        Nothing -> print "no parse" >> return m
-        Just [] -> return m
-        Just xs -> evalStepComm ref e $ map (\c -> ([], c)) xs
-step _ _ (ref, Just [], e) = return (ref, Nothing, e)
-step _ _ (ref, Just xs, e) = evalStepComm ref e xs
+    Nothing -> return m
+    Just Exit -> exitSuccess -- Todo el programa termina
+    Just (Input xs) -> case parserComm xs of
+      Nothing -> putMVar (out e) (Error "Parse error") >> return m
+      Just [] -> putMVar (out e) Ready >> return m
+      Just xs -> evalStepComm i e $ map (\c -> ([], c)) xs
+step _ _ (i, Just [], e) = putMVar (out e) Ready >> return (i, Nothing, e)
+step _ _ (i, Just xs, e) = evalStepComm i e xs
 
 data Argumentos = Argumentos
   { fullscreen :: Bool,
@@ -125,8 +125,9 @@ main = do
   let d = case args of
         Argumentos True _ _ _ _ -> FullScreen
         Argumentos False w h _ _ -> makeWindow w h
-  ref <- newIORef ""
-  runProgram d (files args) ref (refresh args)
+  entrada <- newEmptyMVar
+  salida <- newEmptyMVar
+  runProgram d (files args) entrada salida (refresh args)
 
 getFile :: FilePath -> IO String
 getFile f =
@@ -142,33 +143,41 @@ getFile f =
 inp :: String
 inp = ">> "
 
-consola :: IORef String -> InputT IO ()
-consola ref = do
+consola :: MVar Input -> MVar Output -> InputT IO ()
+consola i o = do
   input <- getInputLine inp
   case input of
-    Nothing -> liftIO (atomicWriteIORef ref ":q")
-    Just "" -> consola ref
-    Just ":q" -> liftIO (atomicWriteIORef ref ":q") -- La diferencia es que no hace loop
-    Just x -> liftIO (atomicWriteIORef ref x) >> consola ref
+    Nothing -> liftIO (putMVar i Exit)
+    Just "" -> consola i o
+    Just ":q" -> liftIO (putMVar i Exit)
+    Just x -> liftIO (putMVar i (Input x)) >> waiter i o
 
-hiloConsola :: IORef String -> IO ()
-hiloConsola ref = runInputT defaultSettings (consola ref)
+waiter :: MVar Input -> MVar Output -> InputT IO ()
+waiter i o = do
+  output <- liftIO $ takeMVar o
+  case output of
+    Ready -> consola i o
+    Error xs -> liftIO (putStrLn xs) >> consola i o
+    Show xs -> liftIO (putStrLn xs) >> waiter i o
 
-runProgram :: Display -> [FilePath] -> IORef String -> Int -> IO ()
-runProgram d fs ref r =
+hiloConsola :: MVar Input -> MVar Output -> IO ()
+hiloConsola i o = runInputT defaultSettings (waiter i o)
+
+runProgram :: Display -> [FilePath] -> MVar Input -> MVar Output -> Int -> IO ()
+runProgram d fs i o r =
   mapM getFile fs >>= \s -> case parserComm $ concat s of
-    Nothing -> print "Parse error en archivos" >> forkRun d Nothing defaultEnv ref r
+    Nothing -> putStrLn "Parse error en archivos" >> putMVar o Ready >> forkRun d Nothing (defaultEnv i o) i o r
     Just cms ->
       let cms' = map (comm2Bound []) cms
-       in eval1st cms' >>= \case
+       in eval1st cms' i o >>= \case
             Left str -> print str
-            Right (m, e) -> forkRun d m e ref r
+            Right (m, e) -> forkRun d m e i o r
 
-forkRun :: Display -> Maybe [([Exp], Comm)] -> Env -> IORef String -> Int -> IO ()
-forkRun d m e ref hz = forkIO (hiloConsola ref) >> simulateIO d white hz (ref, m, e) env2Pic step
+forkRun :: Display -> Maybe [([Exp], Comm)] -> Env -> MVar Input -> MVar Output -> Int -> IO ()
+forkRun d m e i o hz = forkIO (hiloConsola i o) >> simulateIO d white hz (i, m, e) env2Pic step
 
-eval1st :: [Comm] -> IO (Either String (Maybe [([Exp], Comm)], Env))
-eval1st [] = return $ return (Nothing, defaultEnv)
-eval1st (x : xs) =
+eval1st :: [Comm] -> MVar Input -> MVar Output -> IO (Either String (Maybe [([Exp], Comm)], Env))
+eval1st [] i o = return $ return (Nothing, defaultEnv i o)
+eval1st (x : xs) i o =
   let ys = map (\c -> ([], c)) xs
-   in runLogo' defaultEnv (eval [] x) >>= \zs -> return $ fmap (B.first (fmap (++ ys))) zs
+   in runLogo (defaultEnv i o) (eval [] x) >>= \zs -> return $ fmap (B.first (fmap (++ ys))) zs

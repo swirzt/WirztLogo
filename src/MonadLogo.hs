@@ -14,6 +14,7 @@ import qualified Data.Map as M
 import GlobalEnv
 import Graphics.Gloss
 import Lib
+import Relude.Lifted.Exit (exitSuccess)
 
 class (MonadIO m, MonadState Env m, MonadError String m) => MonadLogo m
 
@@ -23,14 +24,25 @@ nada = return ()
 failLogo :: MonadLogo m => String -> m a
 failLogo = throwError
 
-getLogo :: MonadLogo m => m String
-getLogo = liftIO getLine
+showLogo :: (MonadLogo m, Show a) => a -> m ()
+showLogo a = do
+  s <- get
+  liftIO $ putMVar (out s) (Show (Prelude.show a))
 
 printLogo :: MonadLogo m => String -> m ()
-printLogo = liftIO . putStrLn
+printLogo str = do
+  s <- get
+  liftIO $ putMVar (out s) (Show str)
 
 getInput :: MonadLogo m => String -> m String
-getInput i = liftIO (putStr i) >> getLogo
+getInput i = do
+  s <- get
+  liftIO (putMVar (out s) (Show i))
+  liftIO (putMVar (out s) Ready)
+  inp <- liftIO (takeMVar (inp s))
+  case inp of
+    Exit -> exitSuccess
+    Input str -> return str
 
 getData :: MonadLogo m => (Env -> a) -> m a
 getData f = get >>= return . f
@@ -146,8 +158,8 @@ type Logo = StateT Env (ExceptT String IO)
 
 instance MonadLogo Logo
 
-runLogo :: Logo a -> IO (Either String (a, Env))
-runLogo m = runExceptT $ runStateT m defaultEnv
+-- runLogo :: Logo a -> IO (Either String (a, Env))
+-- runLogo m = runExceptT $ runStateT m defaultEnv
 
-runLogo' :: Env -> Logo a -> IO (Either String (a, Env))
-runLogo' e m = runExceptT $ runStateT m e
+runLogo :: Env -> Logo a -> IO (Either String (a, Env))
+runLogo e m = runExceptT $ runStateT m e

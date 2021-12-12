@@ -1,6 +1,7 @@
 module GlobalEnv (Env (..), defaultEnv) where
 
-import Common (Comm, Exp)
+import Common (Comm, Exp, Input, Output)
+import Control.Concurrent.MVar (MVar)
 import Data.Map (Map, empty)
 import Graphics.Gloss (Color, Picture, black)
 
@@ -14,8 +15,10 @@ data Env = Env
     pics :: [Picture], -- Imagenes ya calculadas en el entorno
     vars :: Map String Exp, -- Almacena las definiciones de Variables en el entorno
     comms :: Map String (Int, [Comm]), -- Almacena las definiciones de Comandos en el entorno
-    escala :: Float -- Cuanto se debe escalar la imagen
+    escala :: Float, -- Cuanto se debe escalar la imagen
+    inp :: MVar Input, -- Variable de comunicación de entrada
+    out :: MVar Output -- Variable de comunicación de salida
   }
 
-defaultEnv :: Env
+defaultEnv :: MVar Input -> MVar Output -> Env
 defaultEnv = Env 0 0 0 True False black [] empty empty 5

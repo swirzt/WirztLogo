@@ -177,14 +177,10 @@ runExp _ (Towards _ _) =
 runExp e (Var name) = getVar name >>= runExp e
 runExp e (BinaryOp f x y) = binary e x y f
 runExp e Read = do
-  printLogo "Ingrese una expresión:\n>>"
-  input <- getLogo
+  input <- getInput "Ingrese una expresión:"
   case parserExp input of
     Nothing -> printLogo "Ingreso incorrecto, vuelva a intentar." >> runExp e Read
     Just i -> runExp e i
--- let input' = if isAlpha $ head input -- Si es un string le agrego " para que se pueda parsear
---              then ':' : input
---              else input
 runExp e (IfE eb et ef) = do
   b <- runExp e eb
   if ifF b
