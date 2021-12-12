@@ -172,7 +172,7 @@ hiloConsola :: MVar Input -> MVar Output -> IO ()
 hiloConsola i o = runInputT defaultSettings (waiter i o)
 
 runProgram :: Display -> [FilePath] -> MVar Input -> MVar Output -> Int -> IO ()
--- runProgram d [] i o r = putMVar o Ready >> forkRun d Nothing (defaultEnv i o) i o r
+runProgram d [] i o r = putMVar o Ready >> forkRun d Nothing (defaultEnv i o) i o r
 runProgram d fs i o r =
   mapM getFile fs >>= \s -> case parserComm $ concat s of
     Nothing -> putStrLn "Parse error en archivos" >> putMVar o Ready >> forkRun d Nothing (defaultEnv i o) i o r
