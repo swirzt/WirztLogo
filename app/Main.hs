@@ -2,16 +2,24 @@
 
 module Main where
 
-import Common
+import Common (Comm, Exp, Input (..), Output (..))
 import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar
+  ( MVar,
+    newEmptyMVar,
+    putMVar,
+    takeMVar,
+    tryTakeMVar,
+  )
 import Control.Exception (IOException, catch)
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Data.Bifunctor as B
 import Data.Char (isSpace)
-import Data.IORef (IORef, atomicWriteIORef, newIORef, readIORef)
 import Eval (eval)
-import GlobalEnv (Env (dir, out, pics, posx, posy, show), defaultEnv)
+import GlobalEnv
+  ( Env (dir, inp, out, pics, posx, posy, show),
+    defaultEnv,
+  )
 import Graphics.Gloss
   ( Display (..),
     Picture,
@@ -35,10 +43,10 @@ import Text.Read (readMaybe)
 makeWindow :: Int -> Int -> Display
 makeWindow w h = InWindow "LOGO" (w, h) (0, 0)
 
-type Model = (MVar Input, Maybe [([Exp], Comm)], Env)
+type Model = (Maybe [([Exp], Comm)], Env)
 
 env2Pic :: Model -> IO Picture
-env2Pic (_, _, e) =
+env2Pic (_, e) =
   let x = posx e
       y = posy e
       d = dir e
@@ -50,25 +58,25 @@ env2Pic (_, _, e) =
           else picc
    in return (scale 5 5 $ pictures piccc)
 
-evalStepComm :: MVar Input -> Env -> [([Exp], Comm)] -> IO Model
-evalStepComm _ _ [] = undefined -- No debería llegar a esto
-evalStepComm ref e ((ex, x) : xs) =
+evalStepComm :: Env -> [([Exp], Comm)] -> IO Model
+evalStepComm _ [] = undefined -- No debería llegar a esto
+evalStepComm e ((ex, x) : xs) =
   runLogo e (eval ex x) >>= \case
-    Left str -> putMVar (out e) (Error str) >> return (ref, Nothing, e) -- Que hacer en caso de error?
-    Right (mayComm, e') -> let retComm = maybe xs (++ xs) mayComm in return (ref, Just retComm, e')
+    Left str -> putMVar (out e) (Error str) >> return (Nothing, e) -- Que hacer en caso de error?
+    Right (mayComm, e') -> let retComm = maybe xs (++ xs) mayComm in return (Just retComm, e')
 
 step :: a -> b -> Model -> IO Model
-step _ _ m@(i, Nothing, e) = do
-  input <- tryTakeMVar i
+step _ _ m@(Nothing, e) = do
+  input <- tryTakeMVar $ inp e
   case input of
     Nothing -> return m
     Just Exit -> exitSuccess -- Todo el programa termina
     Just (Input xs) -> case parserComm xs of
       Nothing -> putMVar (out e) (Error "Parse error") >> return m
       Just [] -> putMVar (out e) Ready >> return m
-      Just xs -> evalStepComm i e $ map (\c -> ([], c)) xs
-step _ _ (i, Just [], e) = putMVar (out e) Ready >> return (i, Nothing, e)
-step _ _ (i, Just xs, e) = evalStepComm i e xs
+      Just ys -> evalStepComm e $ map (\c -> ([], c)) ys
+step _ _ (Just [], e) = putMVar (out e) Ready >> return (Nothing, e)
+step _ _ (Just xs, e) = evalStepComm e xs
 
 data Argumentos = Argumentos
   { fullscreen :: Bool,
@@ -140,12 +148,12 @@ getFile f =
             return ""
         )
 
-inp :: String
-inp = ">> "
+consoleSym :: String
+consoleSym = ">> "
 
 consola :: MVar Input -> MVar Output -> InputT IO ()
 consola i o = do
-  input <- getInputLine inp
+  input <- getInputLine consoleSym
   case input of
     Nothing -> liftIO (putMVar i Exit)
     Just "" -> consola i o
@@ -164,6 +172,7 @@ hiloConsola :: MVar Input -> MVar Output -> IO ()
 hiloConsola i o = runInputT defaultSettings (waiter i o)
 
 runProgram :: Display -> [FilePath] -> MVar Input -> MVar Output -> Int -> IO ()
+-- runProgram d [] i o r = putMVar o Ready >> forkRun d Nothing (defaultEnv i o) i o r
 runProgram d fs i o r =
   mapM getFile fs >>= \s -> case parserComm $ concat s of
     Nothing -> putStrLn "Parse error en archivos" >> putMVar o Ready >> forkRun d Nothing (defaultEnv i o) i o r
@@ -174,7 +183,7 @@ runProgram d fs i o r =
             Right (m, e) -> forkRun d m e i o r
 
 forkRun :: Display -> Maybe [([Exp], Comm)] -> Env -> MVar Input -> MVar Output -> Int -> IO ()
-forkRun d m e i o hz = forkIO (hiloConsola i o) >> simulateIO d white hz (i, m, e) env2Pic step
+forkRun d m e i o hz = forkIO (hiloConsola i o) >> simulateIO d white hz (m, e) env2Pic step
 
 eval1st :: [Comm] -> MVar Input -> MVar Output -> IO (Either String (Maybe [([Exp], Comm)], Env))
 eval1st [] i o = return $ return (Nothing, defaultEnv i o)

@@ -39,8 +39,8 @@ getInput i = do
   s <- get
   liftIO (putMVar (out s) (Show i))
   liftIO (putMVar (out s) Ready)
-  inp <- liftIO (takeMVar (inp s))
-  case inp of
+  input <- liftIO (takeMVar (inp s))
+  case input of
     Exit -> exitSuccess
     Input str -> return str
 
