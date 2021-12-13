@@ -7,6 +7,7 @@ import Graphics.Gloss (line)
 import Lib (comm2Bound, grad2radian, parserExp, radian2grad)
 import MonadLogo
 import Relude.List ((!!?))
+import Text.Read (readMaybe)
 
 type EvalRet = Maybe [([Exp], Comm)]
 
@@ -177,10 +178,10 @@ runExp _ (Towards _ _) =
 runExp e (Var name) = getVar name >>= runExp e
 runExp e (BinaryOp f x y) = binary e x y f
 runExp e Read = do
-  input <- getInput "Ingrese una expresión:"
-  case parserExp input of
-    Nothing -> printLogo "Ingreso incorrecto, vuelva a intentar." >> runExp e Read
-    Just i -> runExp e i
+  input <- getInput "Ingrese un número:"
+  case readMaybe input of
+    Nothing -> printLogo "Ingreso incorrecto, se espera un número." >> runExp e Read
+    Just i -> runExp e (Num i)
 runExp e (IfE eb et ef) = do
   b <- runExp e eb
   if ifF b

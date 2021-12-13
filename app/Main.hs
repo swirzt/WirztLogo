@@ -74,7 +74,7 @@ step _ _ m@(Nothing, e) = do
       Nothing -> putMVar (out e) (Error "Parse error") >> return m
       Just [] -> putMVar (out e) Ready >> return m
       Just ys -> evalStepComm e $ map (\c -> ([], c)) ys
-    Just (ToFile ft xs) -> toFile ft xs e >> return m
+    Just (ToFile ft xs) -> toFile ft xs e >> exitSuccess -- Quería poder seguir después de guardar pero da error
 step _ _ (Just [], e) = putMVar (out e) Ready >> return (Nothing, e)
 step _ _ (Just xs, e) = evalStepComm e xs
 
@@ -169,8 +169,8 @@ consola i o = do
     Nothing -> liftIO (putMVar i Exit)
     Just "" -> consola i o
     Just ":q" -> liftIO (putMVar i Exit)
-    Just (':' : 's' : 'g' : xs) -> let ys = dropWhile isSpace xs in liftIO (putMVar i (ToFile GIF ys)) >> waiter i o
-    Just (':' : 's' : 'p' : xs) -> let ys = dropWhile isSpace xs in liftIO (putMVar i (ToFile PNG ys)) >> waiter i o
+    Just (':' : 's' : 'g' : xs) -> let ys = dropWhile isSpace xs in liftIO (putMVar i (ToFile GIF ys))
+    Just (':' : 's' : 'p' : xs) -> let ys = dropWhile isSpace xs in liftIO (putMVar i (ToFile PNG ys))
     Just x -> liftIO (putMVar i (Input x)) >> waiter i o
 
 waiter :: MVar Input -> MVar Output -> InputT IO ()
@@ -186,13 +186,13 @@ hiloConsola i o = runInputT defaultSettings (waiter i o)
 
 runProgram :: Display -> MVar Input -> MVar Output -> Argumentos -> IO ()
 runProgram d i o args
-  | files args == [] = putMVar o Ready >> forkRun d Nothing (defaultEnv i o (height args, width args)) i o (refresh args)
+  | null (files args) = putMVar o Ready >> forkRun d Nothing (defaultEnv i o (width args, height args)) i o (refresh args)
   | otherwise =
     mapM getFile (files args) >>= \s -> case parserComm $ concat s of
-      Nothing -> putStrLn "Parse error en archivos" >> putMVar o Ready >> forkRun d Nothing (defaultEnv i o (height args, width args)) i o (refresh args)
+      Nothing -> putStrLn "Parse error en archivos" >> putMVar o Ready >> forkRun d Nothing (defaultEnv i o (width args, height args)) i o (refresh args)
       Just cms ->
         let cms' = map (comm2Bound []) cms
-         in eval1st cms' i o (height args, width args) >>= \case
+         in eval1st cms' i o (width args, height args) >>= \case
               Left str -> print str
               Right (m, e) -> forkRun d m e i o (refresh args)
 
