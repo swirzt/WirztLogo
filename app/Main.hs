@@ -87,7 +87,7 @@ toFile GIF f e =
   let size = toSave e
       pcs = reverse $ pics e
       n = length pcs
-   in exportPicturesToGif 1 LoopingForever size white f (\x -> pictures $ take (floorFloatInt x) pcs) [1 .. (fromIntegral n)]
+   in exportPicturesToGif 1 LoopingForever size white f (\x -> pictures $ take (floorFloatInt x) pcs) [0 .. (fromIntegral $ n - 1)]
 
 data Argumentos = Argumentos
   { fullscreen :: Bool,
