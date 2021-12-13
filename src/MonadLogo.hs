@@ -43,6 +43,7 @@ getInput i = do
   case input of
     Exit -> exitSuccess
     Input str -> return str
+    ToFile _ _ -> failLogo "Se pedía una exp pero se otorgó una llamada a exportar."
 
 getData :: MonadLogo m => (Env -> a) -> m a
 getData f = get >>= return . f
