@@ -18,6 +18,13 @@ packages:
       sha256: 5242e0764d38a946b592e2e56c6a27b7ad516d957acaf3448fed2e43f20a6cd7
   original:
     hackage: simple-get-opt-0.4@sha256:0ba4d32f64b26d30f6182a3fcd88c71d71622035152e726de41e9a46d945b09f,765
+- completed:
+    hackage: gloss-export-0.1.0.4@sha256:3c685ca24d32ebb8daf7694ea8f61c20e608ee62bf433d153bd006f87361118a,2277
+    pantry-tree:
+      size: 872
+      sha256: a9fe0e7f12e243966ef8dc51155fcf121a903d7658f459e306245b649e75345c
+  original:
+    hackage: gloss-export-0.1.0.4@sha256:3c685ca24d32ebb8daf7694ea8f61c20e608ee62bf433d153bd006f87361118a,2277
 snapshots:
 - completed:
     size: 563099

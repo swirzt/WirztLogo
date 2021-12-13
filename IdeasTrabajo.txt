@@ -4,3 +4,5 @@ Para esto decidí basar las observaciones de mi implementación en la de https:/
 Así como algunas cosas específicas del lenguaje (o de la implementación de https://turtleacademy.com/), por ej. si el constructor list no está entre parentesis, entonces espera exactamente 2 Expresiones, de lo contrario de error de Parseo
 
 Utilizo gloss para mi implementación gráfica
+
+instalar paquetes:  libxrandr-dev libxinerama-dev libxcursor-dev libxxf86vm-dev

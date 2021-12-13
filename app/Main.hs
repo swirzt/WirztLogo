@@ -27,6 +27,7 @@ import Graphics.Gloss
     scale,
     white,
   )
+import Graphics.Gloss.Export
 import Graphics.Gloss.Interface.IO.Simulate (simulateIO)
 import Lib (comm2Bound, getTortu, parserComm)
 import MonadLogo (runLogo)
@@ -75,8 +76,12 @@ step _ _ m@(Nothing, e) = do
       Nothing -> putMVar (out e) (Error "Parse error") >> return m
       Just [] -> putMVar (out e) Ready >> return m
       Just ys -> evalStepComm e $ map (\c -> ([], c)) ys
+    Just (ToFile xs) -> toFile xs e >> return m
 step _ _ (Just [], e) = putMVar (out e) Ready >> return (Nothing, e)
 step _ _ (Just xs, e) = evalStepComm e xs
+
+toFile :: FilePath -> Env -> IO ()
+toFile f e = do i <- 
 
 data Argumentos = Argumentos
   { fullscreen :: Bool,
@@ -135,7 +140,7 @@ main = do
         Argumentos False w h _ _ -> makeWindow w h
   entrada <- newEmptyMVar
   salida <- newEmptyMVar
-  runProgram d (files args) entrada salida (refresh args)
+  runProgram d entrada salida args
 
 getFile :: FilePath -> IO String
 getFile f =
@@ -158,6 +163,7 @@ consola i o = do
     Nothing -> liftIO (putMVar i Exit)
     Just "" -> consola i o
     Just ":q" -> liftIO (putMVar i Exit)
+    Just (':' : 's' : xs) -> let ys = dropWhile isSpace xs in liftIO (putMVar i (ToFile ys)) >> waiter i o
     Just x -> liftIO (putMVar i (Input x)) >> waiter i o
 
 waiter :: MVar Input -> MVar Output -> InputT IO ()
@@ -171,22 +177,22 @@ waiter i o = do
 hiloConsola :: MVar Input -> MVar Output -> IO ()
 hiloConsola i o = runInputT defaultSettings (waiter i o)
 
-runProgram :: Display -> [FilePath] -> MVar Input -> MVar Output -> Int -> IO ()
-runProgram d [] i o r = putMVar o Ready >> forkRun d Nothing (defaultEnv i o) i o r
-runProgram d fs i o r =
-  mapM getFile fs >>= \s -> case parserComm $ concat s of
-    Nothing -> putStrLn "Parse error en archivos" >> putMVar o Ready >> forkRun d Nothing (defaultEnv i o) i o r
+runProgram :: Display -> MVar Input -> MVar Output -> Argumentos -> IO ()
+runProgram d i o args | files args == [] = putMVar o Ready >> forkRun d Nothing (defaultEnv i o (height args, width args)) i o (refresh args)
+                      | otherwise = 
+  mapM getFile (files args) >>= \s -> case parserComm $ concat s of
+    Nothing -> putStrLn "Parse error en archivos" >> putMVar o Ready >> forkRun d Nothing (defaultEnv i o (height args, width args)) i o r
     Just cms ->
       let cms' = map (comm2Bound []) cms
-       in eval1st cms' i o >>= \case
+       in eval1st cms' i o (height args, width args)>>= \case
             Left str -> print str
             Right (m, e) -> forkRun d m e i o r
 
 forkRun :: Display -> Maybe [([Exp], Comm)] -> Env -> MVar Input -> MVar Output -> Int -> IO ()
 forkRun d m e i o hz = forkIO (hiloConsola i o) >> simulateIO d white hz (m, e) env2Pic step
 
-eval1st :: [Comm] -> MVar Input -> MVar Output -> IO (Either String (Maybe [([Exp], Comm)], Env))
-eval1st [] i o = return $ return (Nothing, defaultEnv i o)
+eval1st :: [Comm] -> MVar Input -> MVar Output -> (Int,Int) -> IO (Either String (Maybe [([Exp], Comm)], Env))
+eval1st [] i o s = return $ return (Nothing, defaultEnv i o s)
 eval1st (x : xs) i o =
   let ys = map (\c -> ([], c)) xs
-   in runLogo (defaultEnv i o) (eval [] x) >>= \zs -> return $ fmap (B.first (fmap (++ ys))) zs
+   in runLogo (defaultEnv i o s) (eval [] x) >>= \zs -> return $ fmap (B.first (fmap (++ ys))) zs

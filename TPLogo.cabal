@@ -44,6 +44,7 @@ library
     , exceptions
     , filepath
     , gloss
+    , gloss-export
     , haskeline
     , mtl
     , random >=1.2.1
@@ -66,6 +67,7 @@ executable TPLogo-exe
     , exceptions
     , filepath
     , gloss
+    , gloss-export
     , haskeline
     , mtl
     , random >=1.2.1
@@ -89,6 +91,7 @@ test-suite TPLogo-test
     , exceptions
     , filepath
     , gloss
+    , gloss-export
     , haskeline
     , mtl
     , random >=1.2.1

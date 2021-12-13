@@ -54,4 +54,6 @@ data Comm
 
 data Output = Ready | Error String | Show String
 
-data Input = Exit | Input String
+data FileType = PNG | GIF
+
+data Input = Exit | Input String | ToFile FileType FilePath

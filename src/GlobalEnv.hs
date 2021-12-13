@@ -17,8 +17,9 @@ data Env = Env
     comms :: Map String (Int, [Comm]), -- Almacena las definiciones de Comandos en el entorno
     escala :: Float, -- Cuanto se debe escalar la imagen
     inp :: MVar Input, -- Variable de comunicación de entrada
-    out :: MVar Output -- Variable de comunicación de salida
+    out :: MVar Output, -- Variable de comunicación de salida
+    toSave :: (Int, Int) -- Tamaño en píxeles de la pantalla y como se guardará en el archivo
   }
 
-defaultEnv :: MVar Input -> MVar Output -> Env
+defaultEnv :: MVar Input -> MVar Output -> (Int, Int) -> Env
 defaultEnv = Env 0 0 0 True False black [] empty empty 5
