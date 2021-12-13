@@ -4,37 +4,20 @@ module Main where
 
 import Common (Comm, Exp, FileType (..), Input (..), Output (..))
 import Control.Concurrent (forkIO)
-import Control.Concurrent.MVar
-  ( MVar,
-    newEmptyMVar,
-    putMVar,
-    takeMVar,
-    tryTakeMVar,
-  )
+import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar, tryTakeMVar)
 import Control.Exception (IOException, catch)
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Data.Bifunctor as B
 import Data.Char (isSpace)
 import Eval (eval)
 import GHC.Float.RealFracMethods (floorFloatInt)
-import GlobalEnv
-import Graphics.Gloss
-  ( Display (..),
-    Picture,
-    pictures,
-    scale,
-    white,
-  )
-import Graphics.Gloss.Export
+import GlobalEnv (Env (dir, escala, inp, out, pics, posx, posy, show, toSave), defaultEnv)
+import Graphics.Gloss (Display (..), Picture, pictures, scale, white)
+import Graphics.Gloss.Export (GifLooping (LoopingForever), exportPictureToPNG, exportPicturesToGif)
 import Graphics.Gloss.Interface.IO.Simulate (simulateIO)
 import Lib (comm2Bound, getTortu, parserComm)
 import MonadLogo (runLogo)
-import SimpleGetOpt
-  ( ArgDescr (NoArg, ReqArg),
-    OptDescr (Option),
-    OptSpec (..),
-    getOpts,
-  )
+import SimpleGetOpt (ArgDescr (NoArg, ReqArg), OptDescr (Option), OptSpec (..), getOpts)
 import System.Console.Haskeline (InputT, defaultSettings, getInputLine, runInputT)
 import System.Exit (exitSuccess)
 import Text.Read (readMaybe)
@@ -51,11 +34,12 @@ env2Pic (_, e) =
       d = dir e
       b = GlobalEnv.show e
       picc = pics e
+      esc = escala e
       piccc =
         if b
           then reverse $ getTortu x y d : picc
           else picc
-   in return (scale 5 5 $ pictures piccc)
+   in return (scale esc esc $ pictures piccc)
 
 evalStepComm :: Env -> [([Exp], Comm)] -> IO Model
 evalStepComm _ [] = undefined -- No debería llegar a esto
@@ -73,7 +57,7 @@ step _ _ m@(Nothing, e) = do
     Just (Input xs) -> case parserComm xs of
       Nothing -> putMVar (out e) (Error "Parse error") >> return m
       Just [] -> putMVar (out e) Ready >> return m
-      Just ys -> evalStepComm e $ map (\c -> ([], c)) ys
+      Just ys -> evalStepComm e $ map (\c -> ([], comm2Bound [] c)) ys
     Just (ToFile ft xs) -> toFile ft xs e >> exitSuccess -- Quería poder seguir después de guardar pero da error
 step _ _ (Just [], e) = putMVar (out e) Ready >> return (Nothing, e)
 step _ _ (Just xs, e) = evalStepComm e xs
@@ -85,9 +69,10 @@ toFile PNG f e =
    in exportPictureToPNG size white f picss
 toFile GIF f e =
   let size = toSave e
+      esc = escala e
       pcs = reverse $ pics e
       n = length pcs
-   in exportPicturesToGif 1 LoopingForever size white f (\x -> pictures $ take (floorFloatInt x) pcs) [0 .. (fromIntegral n)]
+   in exportPicturesToGif 1 LoopingForever size white f (\x -> scale esc esc $ pictures $ take (floorFloatInt x) pcs) [0 .. (fromIntegral n)]
 
 data Argumentos = Argumentos
   { fullscreen :: Bool,
@@ -173,11 +158,20 @@ consola i o = do
     Just (':' : 's' : 'p' : xs) -> let ys = dropWhile isSpace xs in liftIO (putMVar i (ToFile PNG ys))
     Just x -> liftIO (putMVar i (Input x)) >> waiter i o
 
+inputExp :: MVar Input -> MVar Output -> InputT IO ()
+inputExp i o = do
+  input <- getInputLine consoleSym
+  case input of
+    Nothing -> liftIO (putMVar i Exit)
+    Just "" -> inputExp i o
+    Just x -> liftIO (putMVar i (Input x)) >> waiter i o
+
 waiter :: MVar Input -> MVar Output -> InputT IO ()
 waiter i o = do
   output <- liftIO $ takeMVar o
   case output of
     Ready -> consola i o
+    GetExp -> inputExp i o
     Error xs -> liftIO (putStrLn xs) >> consola i o
     Show xs -> liftIO (putStrLn xs) >> waiter i o
 

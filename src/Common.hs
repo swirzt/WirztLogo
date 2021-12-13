@@ -4,6 +4,7 @@ module Common where
 -- Exp -> Float
 data Exp
   = Num Float
+  | Negative Exp
   | XCor
   | YCor
   | Heading
@@ -52,7 +53,7 @@ data Comm
   | CommVar String [Exp]
   | Skip -- Comando que no hace nada
 
-data Output = Ready | Error String | Show String
+data Output = Ready | GetExp | Error String | Show String
 
 data FileType = PNG | GIF
 

@@ -4,10 +4,9 @@ import Common (Comm (..), Exp (..))
 import Data.Functor ((<&>))
 import GHC.Float.RealFracMethods (floorFloatInt)
 import Graphics.Gloss (line)
-import Lib (comm2Bound, grad2radian, parserExp, radian2grad)
+import Lib (grad2radian, parserExp, radian2grad)
 import MonadLogo
 import Relude.List ((!!?))
-import Text.Read (readMaybe)
 
 type EvalRet = Maybe [([Exp], Comm)]
 
@@ -78,7 +77,7 @@ eval e (Ford expp) = moveLine e expp (+)
 eval e (Back expp) = moveLine e expp (-)
 eval e (TRight expp) = modDir e expp (changeDir (+))
 eval e (TLeft expp) = modDir e expp (changeDir (-))
-eval _ Clear = setX 0 >> setY 0 >> setDir 0 >> resetPics >> noth
+eval _ Clear = setX 0 >> setY 0 >> setDir 0 >> resetPics >> setColor 0 >> noth
 eval _ Clean = resetPics >> noth
 eval _ PUp = penUp >> noth
 eval _ PDown = penDn >> noth
@@ -90,7 +89,7 @@ eval e (SetY expp) = setTo getX (runExp e expp)
 eval e (SetXY exp1 exp2) = setTo (runExp e exp1) (runExp e exp2)
 eval e (SetHead expp) = modDir e expp setDir
 eval e (Rep expp com) = repeatComm e expp com
-eval e (Print expp) = runExp e expp >>= printLogo . Prelude.show >> noth
+eval e (Print expp) = runExp e expp >>= showLogo >> noth
 eval _ (PrintStr str) = printLogo str >> noth
 eval e (SetCo c) = do
   f <- runExp e c
@@ -103,7 +102,7 @@ eval e (IfC eb xs ys) = do
   if ifF b
     then return $ mapCom e xs
     else return $ mapCom e ys
-eval _ (Def name ns cs) = newComm name (length ns) (map (comm2Bound ns) cs) >> noth
+eval _ (Def name ns cs) = newComm name (length ns) cs >> noth
 eval e (Save str expp) = replace e expp >>= newVar str >> noth
 eval e (For str initt end xs) = forLoop e initt end xs (+ 1) (\e1 e2 -> For str e1 e2 xs)
 eval e (ForDelta str initt end delta xs) = do
@@ -153,6 +152,7 @@ binaryReplace e e1 e2 f = do
   return $ f ee1 ee2
 
 replace :: MonadLogo m => [Exp] -> Exp -> m Exp
+replace e (Negative expp) = replace e expp <&> Negative
 replace e (Towards e1 e2) = binaryReplace e e1 e2 Towards
 replace e (Var n) = getVar n >>= replace e
 replace e (BinaryOp f x y) = binaryReplace e x y (BinaryOp f)
@@ -161,7 +161,7 @@ replace e (IfE eb et ef) = do
   eet <- replace e et
   eef <- replace e ef
   return $ IfE eeb eet eef
--- replace e (Access i) = replace e $ e !! i
+replace e (Access i) = replace e $ e !! i
 replace e (Compare f e1 e2) = binaryReplace e e1 e2 (Compare f)
 replace e (And e1 e2) = binaryReplace e e1 e2 And
 replace e (Or e1 e2) = binaryReplace e e1 e2 Or
@@ -170,6 +170,7 @@ replace _ t = return t
 
 runExp :: MonadLogo m => [Exp] -> Exp -> m Float
 runExp _ (Num n) = return n
+runExp e (Negative expp) = runExp e expp >>= \x -> return (- x)
 runExp _ XCor = getX
 runExp _ YCor = getY
 runExp _ Heading = getDir <&> radian2grad
@@ -178,10 +179,10 @@ runExp _ (Towards _ _) =
 runExp e (Var name) = getVar name >>= runExp e
 runExp e (BinaryOp f x y) = binary e x y f
 runExp e Read = do
-  input <- getInput "Ingrese un número:"
-  case readMaybe input of
-    Nothing -> printLogo "Ingreso incorrecto, se espera un número." >> runExp e Read
-    Just i -> runExp e (Num i)
+  input <- getInput "Ingrese una exp"
+  case parserExp input of
+    Nothing -> printLogo "Ingreso incorrecto, ingrese nuevamente." >> runExp e Read
+    Just i -> runExp e i
 runExp e (IfE eb et ef) = do
   b <- runExp e eb
   if ifF b

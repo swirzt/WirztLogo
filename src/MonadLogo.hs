@@ -2,18 +2,16 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
--- Me permiten hacer la definicion e instancia de mi mónada
-
 module MonadLogo where
 
-import Common
-import Control.Concurrent
-import Control.Monad.Except
-import Control.Monad.State
+import Common (Comm, Exp, Input (Exit, Input, ToFile), Output (GetExp, Show))
+import Control.Concurrent (putMVar, takeMVar, threadDelay)
+import Control.Monad.Except (ExceptT, MonadError (..), MonadIO (..), runExceptT)
+import Control.Monad.State (MonadState (get), StateT (runStateT), modify)
 import qualified Data.Map as M
-import GlobalEnv
-import Graphics.Gloss
-import Lib
+import GlobalEnv (Env (color, comms, dir, inp, out, pen, pics, posx, posy, show, vars))
+import Graphics.Gloss (Picture (Color))
+import Lib (normalize, num2color)
 import Relude.Lifted.Exit (exitSuccess)
 
 class (MonadIO m, MonadState Env m, MonadError String m) => MonadLogo m
@@ -38,12 +36,12 @@ getInput :: MonadLogo m => String -> m String
 getInput i = do
   s <- get
   liftIO (putMVar (out s) (Show i))
-  liftIO (putMVar (out s) Ready)
+  liftIO (putMVar (out s) GetExp)
   input <- liftIO (takeMVar (inp s))
   case input of
     Exit -> exitSuccess
     Input str -> return str
-    ToFile _ _ -> failLogo "Se pedía una exp pero se otorgó una llamada a exportar."
+    ToFile _ _ -> undefined -- No debería llegar acá
 
 getData :: MonadLogo m => (Env -> a) -> m a
 getData f = get >>= return . f

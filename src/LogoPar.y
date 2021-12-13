@@ -57,8 +57,8 @@ import Either3
       '>'               { TokenMayor }
       '<'               { TokenMenor }
       '='               { TokenIgual }
-      '<='              { TokenMaIgual }
-      '>='              { TokenMeIgual }
+      '<='              { TokenMeIgual }
+      '>='              { TokenMaIgual }
       '!='              { TokenNoIgual }
       '&&'              { TokenY }
       '||'              { TokenO }
@@ -163,6 +163,7 @@ Exp : num                  { Num $1 }
     | not Exp              { Not $2 }
     | true                 { T }
     | false                { F }
+    | '-' Exp              { Negative $2 }
     | '(' Exp ')'          { $2 }
 
 {
@@ -254,6 +255,9 @@ lexer' ('*':cs) = TokenMul : lexer' cs
 lexer' ('/':cs) = TokenDiv : lexer' cs
 lexer' ('+':cs) = TokenSum : lexer' cs
 lexer' ('-':cs) = TokenDiff : lexer' cs
+-- if isDigit n then TokenNeg : lexnum (n:cs) else TokenDiff : lexer' (n:cs)
+lexer' ('&':'&':cs) = TokenY : lexer' cs
+lexer' ('|':'|':cs) = TokenO : lexer' cs
 
 lexStr cs = (str, lexer' rest)
       where (str, rest) = span isAlphaNum cs
