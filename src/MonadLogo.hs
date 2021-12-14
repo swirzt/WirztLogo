@@ -4,7 +4,7 @@
 
 module MonadLogo where
 
-import Common (Comm, Exp, Input (Exit, Input, ToFile), Output (GetExp, Show))
+import Common (Comm, Input (Exit, Input), Output (GetExp, Show))
 import Control.Concurrent (putMVar, takeMVar, threadDelay)
 import Control.Monad (when)
 import Control.Monad.Except (ExceptT, MonadError (..), MonadIO (..), runExceptT)
@@ -158,7 +158,7 @@ getRandom n = do
   s <- get
   let g = random s
       (m, g') = randomR (0, n) g
-  modify (\s -> s {random = g'})
+  modify (\r -> r {random = g'})
   return m
 
 catchErrors :: MonadLogo m => m a -> m (Maybe a)

@@ -183,9 +183,9 @@ dropEnd :: [a] -> Int -> [a]
 dropEnd l n = snd $ dropEnd' n l
   where
     dropEnd' :: Int -> [a] -> (Int, [a])
-    dropEnd' n [] = (n, [])
-    dropEnd' n (x : xs) =
-      case dropEnd' n xs of
+    dropEnd' p [] = (p, [])
+    dropEnd' p (x : xs) =
+      case dropEnd' p xs of
         (0, ys) -> (0, x : ys)
         (m, []) -> (m - 1, [])
         _ -> undefined -- si m > 0 entonces la lista es vacía

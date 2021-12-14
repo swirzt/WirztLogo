@@ -1,6 +1,6 @@
 module GlobalEnv (Env (..), defaultEnv, showVars, showComm) where
 
-import Common (Comm, Exp, Input, Output, dropEnd, showCommList)
+import Common (Comm, Input, Output, dropEnd, showCommList)
 import Control.Concurrent.MVar (MVar)
 import Data.Map (Map, empty, toList)
 import Graphics.Gloss (Color, Picture, black)

@@ -8,7 +8,6 @@ import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar, tryTakeMV
 import Control.Exception (IOException, catch)
 import Control.Monad (when)
 import Control.Monad.IO.Class (MonadIO (liftIO))
-import qualified Data.Bifunctor as B
 import Data.Char (isSpace)
 import Data.Maybe (isNothing)
 import Eval (eval)
@@ -159,7 +158,7 @@ consoleSym :: String
 consoleSym = ">> "
 
 sendI :: Input -> MVar Input -> MVar Output -> InputT IO ()
-sendI inp i o = liftIO (putMVar i inp) >> waiter i o
+sendI input i o = liftIO (putMVar i input) >> waiter i o
 
 consola :: MVar Input -> MVar Output -> InputT IO ()
 consola i o = do

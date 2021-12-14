@@ -4,7 +4,7 @@ import Common (Comm (..), Exp (..), getBoolOp, getNumOp, ifF)
 import Data.Functor ((<&>))
 import GHC.Float.RealFracMethods (floorFloatInt)
 import Graphics.Gloss (arc, line, rotate, scale, text, translate)
-import Lib (grad2radian, normalize, parserExp, radian2grad)
+import Lib (grad2radian, parserExp, radian2grad)
 import MonadLogo
 import Relude.List ((!!?))
 
@@ -174,7 +174,7 @@ binaryReplace e e1 e2 f = do
 replace :: MonadLogo m => [Exp] -> Exp -> m Exp
 replace e (Negative expp) = replace e expp <&> Negative
 replace e (Towards e1 e2) = binaryReplace e e1 e2 Towards
-replace e (Var n) = getVar n <&> Num
+replace _ (Var n) = getVar n <&> Num
 replace e (BinaryOp f x y) = binaryReplace e x y (BinaryOp f)
 replace e (IfE eb et ef) = do
   eeb <- replace e eb
@@ -218,7 +218,7 @@ runExp e (Towards e1 e2) = do
               else 270
           else cuadrante (radian2grad angle) vx vy
   return grad -- No se como probar que esto sea correcto
-runExp e (Var name) = getVar name
+runExp _ (Var name) = getVar name
 runExp e (BinaryOp f x y) = binary e x y (getNumOp f)
 runExp e Read = do
   input <- getInput "Ingrese una exp"
