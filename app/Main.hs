@@ -13,7 +13,7 @@ import Data.Char (isSpace)
 import Data.Maybe (isNothing)
 import Eval (eval)
 import GHC.Float.RealFracMethods (floorFloatInt)
-import GlobalEnv (Env (dir, escala, inp, out, pics, posx, posy, show, toSave), defaultEnv)
+import GlobalEnv (Env (..), defaultEnv, showComm, showVars)
 import Graphics.Gloss (Display (..), Picture, pictures, scale, white)
 import Graphics.Gloss.Export (GifLooping (LoopingForever), exportPictureToPNG, exportPicturesToGif)
 import Graphics.Gloss.Interface.IO.Simulate (simulateIO)
@@ -22,6 +22,7 @@ import MonadLogo (runLogo)
 import SimpleGetOpt (ArgDescr (NoArg, ReqArg), OptDescr (Option), OptSpec (..), getOpts)
 import System.Console.Haskeline (InputT, defaultSettings, getInputLine, runInputT)
 import System.Exit (exitSuccess)
+import System.Random (StdGen, initStdGen)
 import Text.Read (readMaybe)
 
 makeWindow :: Int -> Int -> Display
@@ -61,6 +62,13 @@ step _ _ m@(Nothing, e) = do
       Just [] -> putMVar (out e) Ready >> return m
       Just ys -> evalStepComm e $ map (\c -> ([], comm2Bound [] c)) ys
     Just (ToFile ft xs) -> toFile ft xs e >> exitSuccess -- Quería poder seguir después de guardar pero da error
+    Just (LoadFile xs) ->
+      getFile xs >>= \zs -> case parserComm zs of
+        Nothing -> putMVar (out e) (Error $ "Parse error en archivo: " ++ xs) >> return m
+        Just [] -> putMVar (out e) Ready >> return m
+        Just ys -> evalStepComm e $ map (\c -> ([], comm2Bound [] c)) ys
+    Just ListV -> let v = showVars e in putMVar (out e) (Show v) >> putMVar (out e) Ready >> return m
+    Just ListC -> let c = showComm e in putMVar (out e) (Show c) >> putMVar (out e) Ready >> return m
 step _ _ (Just [], e) = putMVar (out e) Ready >> return (Nothing, e)
 step _ _ (Just xs, e) = evalStepComm e xs
 
@@ -133,7 +141,8 @@ main = do
         Argumentos False w h _ _ -> makeWindow w h
   entrada <- newEmptyMVar
   salida <- newEmptyMVar
-  runProgram d entrada salida args
+  g <- initStdGen
+  runProgram d g entrada salida args
 
 getFile :: FilePath -> IO String
 getFile f =
@@ -149,6 +158,9 @@ getFile f =
 consoleSym :: String
 consoleSym = ">> "
 
+sendI :: Input -> MVar Input -> MVar Output -> InputT IO ()
+sendI inp i o = liftIO (putMVar i inp) >> waiter i o
+
 consola :: MVar Input -> MVar Output -> InputT IO ()
 consola i o = do
   input <- getInputLine consoleSym
@@ -156,9 +168,12 @@ consola i o = do
     Nothing -> liftIO (putMVar i Exit)
     Just "" -> consola i o
     Just ":q" -> liftIO (putMVar i Exit)
+    Just ":v" -> sendI ListV i o
+    Just ":c" -> sendI ListC i o
+    Just (':' : 'l' : xs) -> let ys = dropWhile isSpace xs in sendI (LoadFile ys) i o
     Just (':' : 's' : 'g' : xs) -> let ys = dropWhile isSpace xs in liftIO (putMVar i (ToFile GIF ys))
     Just (':' : 's' : 'p' : xs) -> let ys = dropWhile isSpace xs in liftIO (putMVar i (ToFile PNG ys))
-    Just x -> liftIO (putMVar i (Input x)) >> waiter i o
+    Just x -> sendI (Input x) i o
 
 inputExp :: MVar Input -> MVar Output -> InputT IO ()
 inputExp i o = do
@@ -180,28 +195,28 @@ waiter i o = do
 hiloConsola :: MVar Input -> MVar Output -> IO ()
 hiloConsola i o = runInputT defaultSettings (waiter i o)
 
-runProgram :: Display -> MVar Input -> MVar Output -> Argumentos -> IO ()
-runProgram d i o args
-  | null (files args) = noComm d i o args
+runProgram :: Display -> StdGen -> MVar Input -> MVar Output -> Argumentos -> IO ()
+runProgram d g i o args
+  | null (files args) = noComm d g i o args
   | otherwise =
     mapM getFile (files args) >>= \s -> case parserComm $ concat s of
-      Nothing -> putStrLn "Parse error en archivos" >> noComm d i o args
+      Nothing -> putStrLn "Parse error en archivos" >> noComm d g i o args
       Just cms ->
         let cms' = map (comm2Bound []) cms
-         in eval1st cms' i o (width args, height args) >>= \case
+         in eval1st cms' g i o (width args, height args) >>= \case
               Left str -> print str
               Right (m, e) -> when (isNothing m) (putMVar o Ready) >> forkRun d m e i o (refresh args)
 
-noComm :: Display -> MVar Input -> MVar Output -> Argumentos -> IO ()
-noComm d i o args = putMVar o Ready >> forkRun d Nothing (defaultEnv i o (width args, height args)) i o (refresh args)
+noComm :: Display -> StdGen -> MVar Input -> MVar Output -> Argumentos -> IO ()
+noComm d g i o args = putMVar o Ready >> forkRun d Nothing (defaultEnv g i o (width args, height args)) i o (refresh args)
 
 forkRun :: Display -> Maybe [([Exp], Comm)] -> Env -> MVar Input -> MVar Output -> Int -> IO ()
 forkRun d m e i o hz = forkIO (hiloConsola i o) >> simulateIO d white hz (m, e) env2Pic step
 
-eval1st :: [Comm] -> MVar Input -> MVar Output -> (Int, Int) -> IO (Either String (Maybe [([Exp], Comm)], Env))
-eval1st [] i o s = return $ return (Nothing, defaultEnv i o s)
-eval1st (x : xs) i o s =
+eval1st :: [Comm] -> StdGen -> MVar Input -> MVar Output -> (Int, Int) -> IO (Either String (Maybe [([Exp], Comm)], Env))
+eval1st [] g i o s = return $ return (Nothing, defaultEnv g i o s)
+eval1st (x : xs) g i o s =
   let ys = map (\c -> ([], c)) xs
-   in runLogo (defaultEnv i o s) (eval [] x) >>= \zs -> case zs of
+   in runLogo (defaultEnv g i o s) (eval [] x) >>= \zs -> case zs of
         Left _ -> return zs
         Right (m, e) -> return $ Right (Just $ maybe ys (++ ys) m, e)

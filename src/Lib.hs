@@ -12,7 +12,7 @@ module Lib
   )
 where
 
-import Common
+import Common (Comm (..), Exp (..))
 import Data.List (elemIndex)
 import Either3 (either3)
 import Graphics.Gloss
@@ -109,6 +109,9 @@ comm2Bound v (DoWhile xs b) =
 comm2Bound v (CommVar str xs) =
   let ys = map (exp2Bound v) xs
    in CommVar str ys
+comm2Bound v (ChangeScale expp) = unary2Bound v expp ChangeScale
+comm2Bound v (Arco e1 e2) = binary2Bound v e1 e2 Arco
+comm2Bound v (SetSizeTexto e) = unary2Bound v e SetSizeTexto
 comm2Bound _ c = c
 
 grad2radian :: Float -> Float

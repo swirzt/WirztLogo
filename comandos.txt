@@ -50,7 +50,6 @@ filled COLOR [comm] -> hace fill después de dibujar, si quedan espacios abierto
 wait TIEMPOMS
 readword -> pide leer de consola
 do.while [comm] boolcond
-notequalp ???? se lo pasaron de largo
 include ID -> importa programas, ID nombre
 clean -> limpia panalla pero no devuelve a 0,0
 
@@ -58,7 +57,7 @@ clean -> limpia panalla pero no devuelve a 0,0
 Comandos para testear lindos
   cs repeat 36 [ rt 10 repeat 8 [ fd 50 lt 45]] 
   repeat 20 [ fd 80 bk 80 rt 18]
-  to dashline repeat 5 [setwidth 1 fd 10 setwidth 3 fd 10] end
+  to dashline [repeat 5 [setwidth 1 fd 10 setwidth 3 fd 10]] end
   to windo :size :color filled :color [repeat 4 [fd :size rt 90]] end 
   to wheel :radius :color arc 360 :radius setcolor :color fill end 
   to car cs pu setxy 130 -50 pd rt 90 fd 70 lt 90 fd 70 lt 90 fd 70 rt 90 fd 100 lt 90 fd 300 lt 90 fd 100 rt 90 fd 70 lt 90 fd 70 lt 90 fd 40 pu fd 30 pd wheel 30 "black fd 240 pu fd 30 pd wheel 30 "black pu setxy 30 80 pd windo 50 "yellow setcolor "black pu setx -100 pd windo 50 "yellow setcolor "black ht end 

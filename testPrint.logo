@@ -1,0 +1,1 @@
+to test [fd 1 bk -2 rt xcor lt ycor clearscreen clean pu pd ht st home setx heading sety towards :a 1 + 1 setxy 1 * 1 readword seth 1 > 0 repeat if 0 true false [print 1 print "hola setcolor 5 if random 0 [to clear [cs] end] [make "x 1]] for ["i 1 2] [skip] for ["i 1 2 3] [skip] wait 4 while 1 [skip] do.while [skip] 1 juan 1 2 3 scale 5 skip] end

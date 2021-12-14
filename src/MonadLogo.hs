@@ -6,13 +6,15 @@ module MonadLogo where
 
 import Common (Comm, Exp, Input (Exit, Input, ToFile), Output (GetExp, Show))
 import Control.Concurrent (putMVar, takeMVar, threadDelay)
+import Control.Monad (when)
 import Control.Monad.Except (ExceptT, MonadError (..), MonadIO (..), runExceptT)
 import Control.Monad.State (MonadState (get), StateT (runStateT), modify)
 import qualified Data.Map as M
-import GlobalEnv (Env (color, comms, dir, inp, out, pen, pics, posx, posy, show, vars))
+import GlobalEnv (Env (..))
 import Graphics.Gloss (Picture (Color))
 import Lib (normalize, num2color)
 import Relude.Lifted.Exit (exitSuccess)
+import System.Random (randomR)
 
 class (MonadIO m, MonadState Env m, MonadError String m) => MonadLogo m
 
@@ -41,7 +43,7 @@ getInput i = do
   case input of
     Exit -> exitSuccess
     Input str -> return str
-    ToFile _ _ -> undefined -- No debería llegar acá
+    _ -> undefined -- No debería llegar acá
 
 getData :: MonadLogo m => (Env -> a) -> m a
 getData f = get >>= return . f
@@ -54,6 +56,9 @@ getY = getData posy
 
 getDir :: MonadLogo m => m Float
 getDir = getData dir
+
+getSizeT :: MonadLogo m => m Float
+getSizeT = getData sizeT
 
 addPicture :: MonadLogo m => Picture -> m ()
 addPicture p = do
@@ -88,6 +93,12 @@ changeDir f n = modify (\s -> s {dir = normalize (f (dir s) n)})
 setColor :: MonadLogo m => Int -> m ()
 setColor n = modify (\s -> s {GlobalEnv.color = num2color n})
 
+setScale :: MonadLogo m => Float -> m ()
+setScale n = modify (\s -> s {escala = n})
+
+setSizeT :: MonadLogo m => Float -> m ()
+setSizeT n = modify (\s -> s {sizeT = n})
+
 showT :: MonadLogo m => m ()
 showT = modify (\s -> s {GlobalEnv.show = True})
 
@@ -121,9 +132,8 @@ getVar str = do
 newComm :: MonadLogo m => String -> Int -> [Comm] -> m ()
 newComm str n c = do
   comm <- getData comms
-  if M.member str comm
-    then failLogo ("comando: " ++ str ++ ", ya declarado.")
-    else modify (\s -> s {comms = M.insert str (n, c) comm})
+  when (M.member str comm) $ printLogo $ "comando: " ++ str ++ ", redefinido."
+  modify (\s -> s {comms = M.insert str (n, c) comm})
 
 delComm :: MonadLogo m => String -> m ()
 delComm str = do
@@ -142,6 +152,14 @@ getComm str = do
 
 wait :: MonadLogo m => Int -> m ()
 wait = liftIO . threadDelay
+
+getRandom :: MonadLogo m => Float -> m Float
+getRandom n = do
+  s <- get
+  let g = random s
+      (m, g') = randomR (0, n) g
+  modify (\s -> s {random = g'})
+  return m
 
 catchErrors :: MonadLogo m => m a -> m (Maybe a)
 catchErrors c =

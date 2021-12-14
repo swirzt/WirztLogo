@@ -38,6 +38,10 @@ import Either3
       while             { TokenWhile }
       skip              { TokenSkip }
       varC              { TokenVarC $$ }
+      scale             { TokenScale }
+      arc               { TokenArc }
+      label             { TokenLabel }
+      labelS            { TokenLabelS }
       
 
       str               { TokenStr $$ }
@@ -54,6 +58,7 @@ import Either3
       towards           { TokenTow }
       varE              { TokenVarE $$ }
       readword          { TokenRead }
+      random            { TokenRandom }
       '>'               { TokenMayor }
       '<'               { TokenMenor }
       '='               { TokenIgual }
@@ -72,10 +77,9 @@ import Either3
 
 %left '&&' '||'
 %nonassoc not
-%nonassoc tuple
-%nonassoc sum difference
 %left '+' '-'
 %left '*' '/'
+%left NEG
 
 
 %%
@@ -90,6 +94,7 @@ CommSeq : CommSeqR           { reverse $1 }
 CommSeqR :: { [Comm] }
 CommSeqR : Comm              { [$1] }
          | CommSeqR Comm     { $2 : $1 }
+         | {- empty -}       { [] }
 
 Comm :: { Comm }
 Comm : fordward Exp                                { Ford $2 }
@@ -112,7 +117,7 @@ Comm : fordward Exp                                { Ford $2 }
      | print str                                   { PrintStr $2 }
      | setcolor Exp                                { SetCo $2 }
      | if Exp '[' CommSeq ']' '[' CommSeq ']'      { IfC $2 $4 $7 }
-     | to varC Args '[' CommSeq ']' end            { Def $2 $3 $5 }
+     | to varC Args CommSeq end                    { Def $2 $3 $4 }
      | make str Exp                                { Save $2 $3 }
      | for '[' str Exp Exp ']' '[' CommSeq ']'     { For $3 $4 $5 $8 }
      | for '[' str Exp Exp Exp ']' '[' CommSeq ']' { ForDelta $3 $4 $5 $6 $9 }
@@ -121,6 +126,10 @@ Comm : fordward Exp                                { Ford $2 }
      | 'do.while' '[' CommSeq ']' Exp              { DoWhile $3 $5 }
      | varC ExpSeq                                 { CommVar $1 $2 }
      | skip                                        { Skip }
+     | scale Exp                                   { ChangeScale $2 }
+     | arc Exp Exp                                 { Arco $2 $3 }
+     | label str                                   { Texto $2 }
+     | labelS Exp                                  { SetSizeTexto $2 }
      | '(' Comm ')'                                { $2 }
 
 Args :: { [String] }
@@ -163,7 +172,8 @@ Exp : num                  { Num $1 }
     | not Exp              { Not $2 }
     | true                 { T }
     | false                { F }
-    | '-' Exp              { Negative $2 }
+    | '-' Exp %prec NEG    { Negative $2 }
+    | random Exp           { Random $2 }
     | '(' Exp ')'          { $2 }
 
 {
@@ -226,6 +236,12 @@ data Token = TokenFd
            | TokenDiff
            | TokenTrue
            | TokenFalse
+           | TokenScale
+           | TokenRandom
+           | TokenArc
+           | TokenLabel
+           | TokenLabelS
+           
 
 lexer :: String -> [Token]
 lexer = lexer' . map toLower
@@ -312,6 +328,11 @@ lexVar cs =
       ("not",rest) -> TokenNo : lexer' rest
       ("true",rest) -> TokenTrue : lexer' rest
       ("false",rest) -> TokenFalse : lexer' rest
+      ("scale",rest) -> TokenScale : lexer' rest
+      ("random",rest) -> TokenRandom : lexer' rest
+      ("arc",rest) -> TokenArc : lexer' rest
+      ("label",rest) -> TokenLabel : lexer' rest
+      ("setlabelheight",rest) -> TokenLabelS : lexer' rest
       (var,rest) -> TokenVarC var : lexer' rest
 
 

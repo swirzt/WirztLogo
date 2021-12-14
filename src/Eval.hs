@@ -3,7 +3,7 @@ module Eval where
 import Common (Comm (..), Exp (..), getBoolOp, getNumOp, ifF)
 import Data.Functor ((<&>))
 import GHC.Float.RealFracMethods (floorFloatInt)
-import Graphics.Gloss (line)
+import Graphics.Gloss (arc, line, rotate, scale, text, translate)
 import Lib (grad2radian, normalize, parserExp, radian2grad)
 import MonadLogo
 import Relude.List ((!!?))
@@ -105,7 +105,7 @@ eval e (For str initt end xs) = forLoop e initt end xs (+ 1) (For str)
 eval e (ForDelta str initt end delta xs) = do
   fdelta <- runExp e delta
   forLoop e initt end xs (+ fdelta) (\e1 e2 -> ForDelta str e1 e2 (Num fdelta))
-eval e (Wait expp) = runExp e expp >>= wait . floorFloatInt >> noth
+eval e (Wait expp) = runExp e expp >>= wait . (* 1000) . floorFloatInt >> noth
 eval e c@(While expp cs) = do
   b <- runExp e expp
   if ifF b
@@ -120,6 +120,28 @@ eval e (CommVar str es) = do
   if n /= length es
     then failLogo $ "La cantidad de argumentos que recibe la función: " ++ str ++ " es incorrecta."
     else return $ mapCom (newEs ++ e) com
+eval e (ChangeScale expp) = runExp e expp >>= setScale >> noth
+eval e (Arco e1 e2) = do
+  x <- getX
+  y <- getY
+  dir <- getDir
+  ee1 <- runExp e e1
+  ee2 <- runExp e e2
+  let degdir = radian2grad dir
+      a = translate x y $ arc degdir ee1 ee2
+  addPicture a
+  noth
+eval _ (Texto str) = do
+  x <- getX
+  y <- getY
+  dir <- getDir
+  size <- getSizeT
+  let degdir = radian2grad dir
+      ang = -90 + degdir
+      a = scale size size $ translate x y $ rotate ang $ text str
+  addPicture a
+  noth
+eval e (SetSizeTexto expp) = runExp e expp >>= setSizeT . (/ 10) >> noth
 eval _ Skip = noth
 
 forLoop :: MonadLogo m => [Exp] -> Exp -> Exp -> [Comm] -> (Float -> Float) -> (Exp -> Exp -> [Comm] -> Comm) -> m EvalRet
@@ -215,3 +237,4 @@ runExp e (Compare f e1 e2) = binary e e1 e2 (getBoolOp f) >>= bool2Float
 runExp e (Not expp) = runExp e expp >>= \x -> if ifF x then return 0 else return 1
 runExp _ T = return 1
 runExp _ F = return 0
+runExp e (Random expp) = runExp e expp >>= getRandom
