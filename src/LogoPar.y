@@ -146,20 +146,20 @@ Exp : num                  { Num $1 }
     | heading              { Heading }                       
     | towards Exp Exp      { Towards $2 $3 }
     | varE                 { Var $1 }
-    | Exp '+' Exp          { BinaryOp (+) $1 $3 }
-    | Exp '-' Exp          { BinaryOp (-) $1 $3 }
-    | Exp '/' Exp          { BinaryOp (/) $1 $3 }
-    | Exp '*' Exp          { BinaryOp (*) $1 $3 }
+    | Exp '+' Exp          { BinaryOp Add $1 $3 }
+    | Exp '-' Exp          { BinaryOp Sub $1 $3 }
+    | Exp '/' Exp          { BinaryOp Div $1 $3 }
+    | Exp '*' Exp          { BinaryOp Mult $1 $3 }
     | readword             { Read }
     | if Exp Exp Exp       { IfE $2 $3 $4 }
-    | Exp '>' Exp          { Compare (>) $1 $3 }
-    | Exp '<' Exp          { Compare (<) $1 $3 }
-    | Exp '=' Exp          { Compare (==) $1 $3 }
-    | Exp '>=' Exp         { Compare (>=) $1 $3 }
-    | Exp '<=' Exp         { Compare (<=) $1 $3 }
-    | Exp '!=' Exp         { Compare (/=) $1 $3 }
-    | Exp '&&' Exp         { And $1 $3 }
-    | Exp '||' Exp         { Or $1 $3 }
+    | Exp '>' Exp          { Compare Gt $1 $3 }
+    | Exp '<' Exp          { Compare Lt $1 $3 }
+    | Exp '=' Exp          { Compare Eq $1 $3 }
+    | Exp '>=' Exp         { Compare GEq $1 $3 }
+    | Exp '<=' Exp         { Compare LEq $1 $3 }
+    | Exp '!=' Exp         { Compare Diff $1 $3 }
+    | Exp '&&' Exp         { Compare And $1 $3 }
+    | Exp '||' Exp         { Compare Or $1 $3 }
     | not Exp              { Not $2 }
     | true                 { T }
     | false                { F }

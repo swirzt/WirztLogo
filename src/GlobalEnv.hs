@@ -13,7 +13,7 @@ data Env = Env
     pen :: Bool, -- Si es True, los movimientos de la tortuga no dibujan
     color :: Color, -- Color del lápiz
     pics :: [Picture], -- Imagenes ya calculadas en el entorno
-    vars :: Map String Exp, -- Almacena las definiciones de Variables en el entorno
+    vars :: Map String Float, -- Almacena las definiciones de Variables en el entorno
     comms :: Map String (Int, [Comm]), -- Almacena las definiciones de Comandos en el entorno
     escala :: Float, -- Cuanto se debe escalar la imagen
     inp :: MVar Input, -- Variable de comunicación de entrada

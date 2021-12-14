@@ -100,7 +100,7 @@ penUp = modify (\s -> s {pen = True})
 penDn :: MonadLogo m => m ()
 penDn = modify (\s -> s {pen = False})
 
-newVar :: MonadLogo m => String -> Exp -> m ()
+newVar :: MonadLogo m => String -> Float -> m ()
 newVar str e = modify (\s -> s {vars = M.insert str e (vars s)})
 
 delVar :: MonadLogo m => String -> m ()
@@ -110,7 +110,7 @@ delVar str = do
     then failLogo ("Variable: " ++ str ++ ", no está definida, no se puede eliminar.")
     else modify (\s -> s {vars = M.delete str varr})
 
-getVar :: MonadLogo m => String -> m Exp
+getVar :: MonadLogo m => String -> m Float
 getVar str = do
   varr <- getData vars
   let mv = M.lookup str varr

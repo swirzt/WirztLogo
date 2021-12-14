@@ -1,5 +1,5 @@
 compile:
-	stack build --ghc-options -threaded
+	stack build --ghc-options -threaded --ghc-options -O3
 
 pedantic:
 	stack build --pedantic

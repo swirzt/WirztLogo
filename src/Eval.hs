@@ -1,10 +1,10 @@
 module Eval where
 
-import Common (Comm (..), Exp (..))
+import Common (Comm (..), Exp (..), getBoolOp, getNumOp, ifF)
 import Data.Functor ((<&>))
 import GHC.Float.RealFracMethods (floorFloatInt)
 import Graphics.Gloss (line)
-import Lib (grad2radian, parserExp, radian2grad)
+import Lib (grad2radian, normalize, parserExp, radian2grad)
 import MonadLogo
 import Relude.List ((!!?))
 
@@ -66,9 +66,6 @@ repeatComm' e n com =
       toret = mapCom e $ conEnd com rep
    in return toret
 
-ifF :: Float -> Bool
-ifF = (/= 0)
-
 noth :: MonadLogo m => m EvalRet
 noth = return Nothing
 
@@ -103,11 +100,11 @@ eval e (IfC eb xs ys) = do
     then return $ mapCom e xs
     else return $ mapCom e ys
 eval _ (Def name ns cs) = newComm name (length ns) cs >> noth
-eval e (Save str expp) = replace e expp >>= newVar str >> noth
-eval e (For str initt end xs) = forLoop e initt end xs (+ 1) (\e1 e2 -> For str e1 e2 xs)
+eval e (Save str expp) = runExp e expp >>= newVar str >> noth
+eval e (For str initt end xs) = forLoop e initt end xs (+ 1) (For str)
 eval e (ForDelta str initt end delta xs) = do
   fdelta <- runExp e delta
-  forLoop e initt end xs (+ fdelta) (\e1 e2 -> ForDelta str e1 e2 (Num fdelta) xs)
+  forLoop e initt end xs (+ fdelta) (\e1 e2 -> ForDelta str e1 e2 (Num fdelta))
 eval e (Wait expp) = runExp e expp >>= wait . floorFloatInt >> noth
 eval e c@(While expp cs) = do
   b <- runExp e expp
@@ -119,19 +116,20 @@ eval e (DoWhile cs expp) =
    in return $ fmap (++ [(e, newWhile)]) (mapCom e cs)
 eval e (CommVar str es) = do
   (n, com) <- getComm str
+  newEs <- mapM (\x -> runExp e x <&> Num) es
   if n /= length es
     then failLogo $ "La cantidad de argumentos que recibe la función: " ++ str ++ " es incorrecta."
-    else return $ mapCom (es ++ e) com
+    else return $ mapCom (newEs ++ e) com
 eval _ Skip = noth
 
-forLoop :: MonadLogo m => [Exp] -> Exp -> Exp -> [Comm] -> (Float -> Float) -> (Exp -> Exp -> Comm) -> m EvalRet
+forLoop :: MonadLogo m => [Exp] -> Exp -> Exp -> [Comm] -> (Float -> Float) -> (Exp -> Exp -> [Comm] -> Comm) -> m EvalRet
 forLoop e e1 e2 cs f g = do
   ee1 <- runExp e e1
   ee2 <- runExp e e2
   if ee1 <= ee2
     then
-      let newFor = g (Num (f ee1)) (Num ee2) -- Lo hago así para no recalcular
-          ys = mapCom (e1 : e) cs
+      let newFor = g (Num (f ee1)) (Num ee2) cs -- Lo hago así para no recalcular
+          ys = mapCom (Num ee1 : e) cs
        in return $ fmap (++ [(e, newFor)]) ys
     else noth
 
@@ -154,7 +152,7 @@ binaryReplace e e1 e2 f = do
 replace :: MonadLogo m => [Exp] -> Exp -> m Exp
 replace e (Negative expp) = replace e expp <&> Negative
 replace e (Towards e1 e2) = binaryReplace e e1 e2 Towards
-replace e (Var n) = getVar n >>= replace e
+replace e (Var n) = getVar n <&> Num
 replace e (BinaryOp f x y) = binaryReplace e x y (BinaryOp f)
 replace e (IfE eb et ef) = do
   eeb <- replace e eb
@@ -163,10 +161,17 @@ replace e (IfE eb et ef) = do
   return $ IfE eeb eet eef
 replace e (Access i) = replace e $ e !! i
 replace e (Compare f e1 e2) = binaryReplace e e1 e2 (Compare f)
-replace e (And e1 e2) = binaryReplace e e1 e2 And
-replace e (Or e1 e2) = binaryReplace e e1 e2 Or
 replace e (Not expp) = replace e expp <&> Not
 replace _ t = return t
+
+cuadrante :: Float -> Float -> Float -> Float
+cuadrante rad x y =
+  if x >= 0
+    then
+      if y >= 0
+        then rad
+        else rad + 360
+    else rad + 180
 
 runExp :: MonadLogo m => [Exp] -> Exp -> m Float
 runExp _ (Num n) = return n
@@ -174,10 +179,25 @@ runExp e (Negative expp) = runExp e expp >>= \x -> return (- x)
 runExp _ XCor = getX
 runExp _ YCor = getY
 runExp _ Heading = getDir <&> radian2grad
-runExp _ (Towards _ _) =
-  return 0 -- Temporal, no se resolverlo
-runExp e (Var name) = getVar name >>= runExp e
-runExp e (BinaryOp f x y) = binary e x y f
+runExp e (Towards e1 e2) = do
+  x <- getX
+  y <- getY
+  x' <- runExp e e1
+  y' <- runExp e e2
+  let vx = y' - y
+      vy = x' - x
+      tangente = vy / vx
+      angle = atan tangente
+      grad =
+        if vx == 0
+          then
+            if vy >= 0
+              then 90
+              else 270
+          else cuadrante (radian2grad angle) vx vy
+  return grad -- No se como probar que esto sea correcto
+runExp e (Var name) = getVar name
+runExp e (BinaryOp f x y) = binary e x y (getNumOp f)
 runExp e Read = do
   input <- getInput "Ingrese una exp"
   case parserExp input of
@@ -191,9 +211,7 @@ runExp e (IfE eb et ef) = do
 runExp e (Access i) = case e !!? i of
   Just n -> runExp e n
   Nothing -> failLogo "Se accedió a una variable no ligada por el entorno"
-runExp e (Compare f e1 e2) = binary e e1 e2 f >>= bool2Float
-runExp e (And e1 e2) = binary e e1 e2 (\x y -> ifF x && ifF y) >>= bool2Float
-runExp e (Or e1 e2) = binary e e1 e2 (\x y -> ifF x || ifF y) >>= bool2Float
+runExp e (Compare f e1 e2) = binary e e1 e2 (getBoolOp f) >>= bool2Float
 runExp e (Not expp) = runExp e expp >>= \x -> if ifF x then return 0 else return 1
 runExp _ T = return 1
 runExp _ F = return 0

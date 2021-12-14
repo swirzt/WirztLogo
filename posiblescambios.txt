@@ -1,0 +1,7 @@
+Arreglar el -Exp (error en towards)
+settear escala
+listar definiciones
+listar variables
+cargar un archivo
+numeros random
+Los comandos que no hice de comandos.txt

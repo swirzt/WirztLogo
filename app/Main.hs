@@ -6,9 +6,11 @@ import Common (Comm, Exp, FileType (..), Input (..), Output (..))
 import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar, tryTakeMVar)
 import Control.Exception (IOException, catch)
+import Control.Monad (when)
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Data.Bifunctor as B
 import Data.Char (isSpace)
+import Data.Maybe (isNothing)
 import Eval (eval)
 import GHC.Float.RealFracMethods (floorFloatInt)
 import GlobalEnv (Env (dir, escala, inp, out, pics, posx, posy, show, toSave), defaultEnv)
@@ -180,15 +182,18 @@ hiloConsola i o = runInputT defaultSettings (waiter i o)
 
 runProgram :: Display -> MVar Input -> MVar Output -> Argumentos -> IO ()
 runProgram d i o args
-  | null (files args) = putMVar o Ready >> forkRun d Nothing (defaultEnv i o (width args, height args)) i o (refresh args)
+  | null (files args) = noComm d i o args
   | otherwise =
     mapM getFile (files args) >>= \s -> case parserComm $ concat s of
-      Nothing -> putStrLn "Parse error en archivos" >> putMVar o Ready >> forkRun d Nothing (defaultEnv i o (width args, height args)) i o (refresh args)
+      Nothing -> putStrLn "Parse error en archivos" >> noComm d i o args
       Just cms ->
         let cms' = map (comm2Bound []) cms
          in eval1st cms' i o (width args, height args) >>= \case
               Left str -> print str
-              Right (m, e) -> forkRun d m e i o (refresh args)
+              Right (m, e) -> when (isNothing m) (putMVar o Ready) >> forkRun d m e i o (refresh args)
+
+noComm :: Display -> MVar Input -> MVar Output -> Argumentos -> IO ()
+noComm d i o args = putMVar o Ready >> forkRun d Nothing (defaultEnv i o (width args, height args)) i o (refresh args)
 
 forkRun :: Display -> Maybe [([Exp], Comm)] -> Env -> MVar Input -> MVar Output -> Int -> IO ()
 forkRun d m e i o hz = forkIO (hiloConsola i o) >> simulateIO d white hz (m, e) env2Pic step
@@ -197,4 +202,6 @@ eval1st :: [Comm] -> MVar Input -> MVar Output -> (Int, Int) -> IO (Either Strin
 eval1st [] i o s = return $ return (Nothing, defaultEnv i o s)
 eval1st (x : xs) i o s =
   let ys = map (\c -> ([], c)) xs
-   in runLogo (defaultEnv i o s) (eval [] x) >>= \zs -> return $ fmap (B.first (fmap (++ ys))) zs
+   in runLogo (defaultEnv i o s) (eval [] x) >>= \zs -> case zs of
+        Left _ -> return zs
+        Right (m, e) -> return $ Right (Just $ maybe ys (++ ys) m, e)

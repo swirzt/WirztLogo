@@ -1,7 +1,29 @@
 module Common where
 
 -- Considero los booleanos como el lenguaje C
--- Exp -> Float
+data NumOps = Add | Sub | Mult | Div deriving (Show)
+
+data BoolOps = Lt | Gt | Eq | GEq | LEq | Diff | And | Or deriving (Show)
+
+ifF :: Float -> Bool
+ifF = (/= 0)
+
+getNumOp :: NumOps -> (Float -> Float -> Float)
+getNumOp Add = (+)
+getNumOp Sub = (-)
+getNumOp Mult = (*)
+getNumOp Div = (/)
+
+getBoolOp :: BoolOps -> (Float -> Float -> Bool)
+getBoolOp Lt = (<)
+getBoolOp Gt = (>)
+getBoolOp Eq = (==)
+getBoolOp GEq = (>=)
+getBoolOp LEq = (<=)
+getBoolOp Diff = (/=)
+getBoolOp And = \x y -> ifF x && ifF y
+getBoolOp Or = \x y -> ifF x || ifF y
+
 data Exp
   = Num Float
   | Negative Exp
@@ -10,17 +32,15 @@ data Exp
   | Heading
   | Towards Exp Exp
   | Var String
-  | BinaryOp (Float -> Float -> Float) Exp Exp
+  | BinaryOp NumOps Exp Exp
   | Read
   | IfE Exp Exp Exp
   | Access Int -- Solo usado dentro de definiciones TO y For
-  -- Sección de bool
-  | Compare (Float -> Float -> Bool) Exp Exp
-  | And Exp Exp
-  | Or Exp Exp
+  | Compare BoolOps Exp Exp
   | Not Exp
   | T
   | F
+  deriving (Show)
 
 data Comm
   = Ford Exp
@@ -52,6 +72,7 @@ data Comm
   | DoWhile [Comm] Exp
   | CommVar String [Exp]
   | Skip -- Comando que no hace nada
+  deriving (Show)
 
 data Output = Ready | GetExp | Error String | Show String
 

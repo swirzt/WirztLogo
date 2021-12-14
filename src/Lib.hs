@@ -53,8 +53,6 @@ exp2Bound v (IfE e1 e2 e3) =
   let ee1 = exp2Bound v e1
    in binary2Bound v e2 e3 (IfE ee1)
 exp2Bound v (Compare f e1 e2) = binary2Bound v e1 e2 (Compare f)
-exp2Bound v (And b1 b2) = binary2Bound v b1 b2 And
-exp2Bound v (Or b1 b2) = binary2Bound v b1 b2 Or
 exp2Bound v (Not b) = unary2Bound v b Not
 exp2Bound _ t = t -- Una vez que no haya problema reemplazar los ultimos con esto
 
