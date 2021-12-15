@@ -77,7 +77,7 @@ data Comm
   | SetSizeTexto Exp
   | Skip -- Comando que no hace nada
 
-data Output = Ready | GetExp | Error String | Show String | End
+data Output = Ready | GetExp | Error String | Show String
 
 data FileType = PNG | GIF
 

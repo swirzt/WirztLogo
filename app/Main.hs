@@ -10,7 +10,7 @@ import Control.Monad (when)
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Data.Char (isSpace)
 import Data.Maybe (isNothing)
-import Eval (eval)
+import Eval (EvalRet, eval)
 import GHC.Float.RealFracMethods (floorFloatInt)
 import GlobalEnv (Env (..), defaultEnv, showComm, showVars)
 import Graphics.Gloss (Display (..), Picture, pictures, scale, white)
@@ -19,7 +19,7 @@ import Graphics.Gloss.Interface.IO.Simulate (simulateIO)
 import Lib (comm2Bound, getTortu, parserComm)
 import MonadLogo (MonadLogo, runLogo)
 import SimpleGetOpt (ArgDescr (NoArg, ReqArg), OptDescr (Option), OptSpec (..), getOpts)
-import System.Console.Haskeline (InputT, defaultSettings, getInputLine, runInputT)
+import System.Console.Haskeline (InputT, defaultSettings, getInputLine, outputStrLn, runInputT)
 import System.Exit (exitSuccess)
 import System.FilePath.Windows (takeExtension)
 import System.Random (StdGen, initStdGen)
@@ -148,15 +148,18 @@ options =
 main :: IO ()
 main = do
   args <- getOpts options
-  let d = case args of
-        Argumentos True _ _ _ _ _ -> FullScreen
-        Argumentos False w h _ _ _ -> makeWindow w h
   entrada <- newEmptyMVar
   salida <- newEmptyMVar
   g <- initStdGen
+  let d = case args of
+        Argumentos True _ _ _ _ _ -> FullScreen
+        Argumentos False w h _ _ _ -> makeWindow w h
+      e = defaultEnv g entrada salida (width args, height args)
+  forkIO $ hiloConsola entrada salida
   case mode args of
-    Interactive -> runProgramI d g entrada salida args
-    CompileFile -> runProgramC d g entrada salida args
+    Interactive -> runProgramI e d args
+
+-- CompileFile -> runProgramC e args
 
 getFile :: FilePath -> IO String
 getFile f =
@@ -169,106 +172,119 @@ getFile f =
             return ""
         )
 
-consoleSym :: String
-consoleSym = ">> "
-
+-- Recibe un Input, lo envía por el canal de Input y va a esperar
 sendI :: Input -> MVar Input -> MVar Output -> InputT IO ()
 sendI input i o = liftIO (putMVar i input) >> waiter i o
 
+-- Recibe un input, lo envía y termina la ejecución de consola
+exit :: MVar Input -> Input -> InputT IO ()
+exit i input = liftIO (putMVar i input)
+
+-- Lee un input de consola y lo envía por la variable Input
+-- El input puede ser una instrucción precedida por ':'
+{- Instrucciones:
+   - :q - Termina la ejecución
+   - :v - Lista los valores guardados de variables
+   - :c - Lista las definiciones guardadas de comandos
+   - :l archivo.logo - Carga el archivo con comandos
+   - :sg archivo.gif - Guarda el dibujo actual en un GIF animado
+   - :sp archivo.png - Guarda el dibujo actual en una imagen PNG
+-}
+-- De lo contrario envía el input como fué ingresado
 consola :: MVar Input -> MVar Output -> InputT IO ()
 consola i o = do
-  input <- getInputLine consoleSym
+  input <- getInputLine ">> "
   case input of
-    Nothing -> liftIO (putMVar i Exit)
+    Nothing -> exit i Exit
     Just "" -> consola i o
-    Just ":q" -> liftIO (putMVar i Exit)
+    Just ":q" -> exit i Exit
     Just ":v" -> sendI ListV i o
     Just ":c" -> sendI ListC i o
-    Just (':' : 'l' : xs) -> let ys = dropWhile isSpace xs in sendI (LoadFile ys) i o
-    Just (':' : 's' : 'g' : xs) -> let ys = dropWhile isSpace xs in liftIO (putMVar i (ToFile GIF ys))
-    Just (':' : 's' : 'p' : xs) -> let ys = dropWhile isSpace xs in liftIO (putMVar i (ToFile PNG ys))
+    Just (':' : 'l' : xs) -> case makeFileName xs of
+      Nothing -> outputStrLn "No se otorgó un nombre de archivo" >> consola i o
+      Just ys -> sendI (LoadFile ys) i o
+    Just (':' : 's' : 'g' : xs) -> case makeFileName xs of
+      Nothing -> outputStrLn "No se otorgó un nombre de archivo" >> consola i o
+      Just ys -> exit i (ToFile GIF ys)
+    Just (':' : 's' : 'p' : xs) -> case makeFileName xs of
+      Nothing -> outputStrLn "No se otorgó un nombre de archivo" >> consola i o
+      Just ys -> exit i (ToFile PNG ys)
     Just x -> sendI (Input x) i o
 
+makeFileName :: String -> Maybe FilePath
+makeFileName str = case dropWhile isSpace str of
+  [] -> Nothing
+  f -> Just f
+
+-- Funciona igual que conssola pero no revisa instrucciones
+-- Las envía tal cual ingresaron
 inputExp :: MVar Input -> MVar Output -> InputT IO ()
 inputExp i o = do
-  input <- getInputLine consoleSym
+  input <- getInputLine ">> "
   case input of
     Nothing -> liftIO (putMVar i Exit)
     Just "" -> inputExp i o
     Just x -> liftIO (putMVar i (Input x)) >> waiter i o
 
+-- Función de espera mientras se evaluan comandos
+{- Puede recibir los siguientes Outputs:
+   - Ready -> Se terminó de evaluar y se espera entrada de consola
+   - GetExp -> Se espera entrada sin parseo de instrucciones ':'
+   - Error str -> La evaluación dió error y se espera entrada de consola
+   - Show str -> Se imprime algo durante la evaluación, se sigue evaluando
+-}
 waiter :: MVar Input -> MVar Output -> InputT IO ()
 waiter i o = do
   output <- liftIO $ takeMVar o
   case output of
     Ready -> consola i o
     GetExp -> inputExp i o
-    Error xs -> liftIO (putStrLn xs) >> consola i o
-    Show xs -> liftIO (putStrLn xs) >> waiter i o
-    End -> return ()
+    Error xs -> outputStrLn xs >> consola i o
+    Show xs -> outputStrLn xs >> waiter i o
 
+-- Función de lift IO para la consola
 hiloConsola :: MVar Input -> MVar Output -> IO ()
 hiloConsola i o = runInputT defaultSettings (waiter i o)
 
-runProgramI :: Display -> StdGen -> MVar Input -> MVar Output -> Argumentos -> IO ()
-runProgramI d g i o args
-  | null (files args) = noComm d g i o args
-  | otherwise =
-    compileFiles (files args) >>= \cms ->
-      let cms' = map (comm2Bound []) cms
-       in eval1st cms' g i o (width args, height args) >>= \case
-            Left str -> print str
-            Right (m, e) -> when (isNothing m) (putMVar o Ready) >> forkRun d m e i o (refresh args)
+-- Correr programa de forma Interactiva
+runProgramI :: Env -> Display -> Argumentos -> IO ()
+runProgramI e d args =
+  case files args of
+    [] -> simulateIO d white (refresh args) (Just [], e) env2Pic step
+    fs ->
+      compileFiles (out e) fs >>= \cms ->
+        let cms' = map (\c -> ([], comm2Bound [] c)) cms
+         in simulateIO d white (refresh args) (Just cms', e) env2Pic step
 
-compileFiles :: [FilePath] -> IO [Comm]
-compileFiles [] = return []
-compileFiles (x : xs) =
+-- Recibe una lista de archivos, los abre y parsea
+-- Si encuentra un error lo muestra en consola y continúa compilando
+-- Devuelve la lista de todos los comandos concatenada
+compileFiles :: MVar Output -> [FilePath] -> IO [Comm]
+compileFiles _ [] = return []
+compileFiles o (x : xs) =
   getFile x >>= \case
-    "" -> compileFiles xs
+    "" -> putMVar o (Show $ "Archivo vacío: " ++ x) >> compileFiles o xs
     ys -> case parserComm ys of
-      Left err -> putStrLn (err ++ " En el archivo: " ++ x ++ ".") >> return []
-      Right zs -> compileFiles xs >>= return . (zs ++)
+      Left err -> putMVar o (Show (err ++ " En el archivo: " ++ x ++ ".")) >> compileFiles o xs
+      Right zs -> compileFiles o xs >>= return . (zs ++)
 
-noComm :: Display -> StdGen -> MVar Input -> MVar Output -> Argumentos -> IO ()
-noComm d g i o args = putMVar o Ready >> forkRun d Nothing (defaultEnv g i o (width args, height args)) i o (refresh args)
-
-forkRun :: Display -> Maybe [([Exp], Comm)] -> Env -> MVar Input -> MVar Output -> Int -> IO ()
-forkRun d m e i o hz = forkIO (hiloConsola i o) >> simulateIO d white hz (m, e) env2Pic step
-
-eval1st :: [Comm] -> StdGen -> MVar Input -> MVar Output -> (Int, Int) -> IO (Either String (Maybe [([Exp], Comm)], Env))
-eval1st [] g i o s = return $ return (Nothing, defaultEnv g i o s)
-eval1st (x : xs) g i o s =
-  let ys = map (\c -> ([], c)) xs
-   in runLogo (defaultEnv g i o s) (eval [] x) >>= \zs -> case zs of
-        Left _ -> return zs
-        Right (m, e) -> return $ Right (Just $ maybe ys (++ ys) m, e)
-
-runProgramC :: Display -> StdGen -> MVar Input -> MVar Output -> Argumentos -> IO ()
-runProgramC d g i o args = case files args of
-  [] -> putStrLn "No se ingresó ningun archivo para el modo de Compilado."
-  xs ->
-    compileFiles xs >>= \case
+runProgramC :: Env -> Argumentos -> IO ()
+runProgramC e args = case files args of
+  [] -> putMVar (out e) $ Show "No se ingresó ningun archivo para el modo de Compilado."
+  [x] -> putMVar (out e) $ Show "Se debe ingresar al menos 2 archivos, el último es el nombre del archivo a guardar."
+  x : xs ->
+    compileFiles (out e) xs >>= \case
       [] -> return ()
       ys ->
-        forkIO (hiloConsola i o)
-          >> let zs = map (comm2Bound []) ys
-              in runLogo (defaultEnv g i o (width args, height args)) (evalFull zs []) >>= \case
-                   Left str -> putMVar o $ Error str
-                   Right (_, e) -> save2File e i o
+        let zs = map (comm2Bound []) ys
+         in runLogo e (evalFull zs []) >>= \case
+              Left str -> putMVar (out e) $ Error str
+              Right (_, e) -> save2File e x
 
-save2File :: Env -> MVar Input -> MVar Output -> IO ()
-save2File e i o = do
-  putMVar o $ Show "Ingrese el nombre del archivo"
-  putMVar o Ready
-  s <- takeMVar i
-  case s of
-    Input ss ->
-      let f = takeWhile (not . isSpace) $ dropWhile isSpace ss
-          ext = takeExtension f
-       in case ext of
-            ".gif" -> toFile GIF f e
-            _ -> toFile PNG f e
-    _ -> save2File e i o
+save2File :: Env -> FilePath -> IO ()
+save2File e f = case takeExtension f of
+  ".gif" -> toFile GIF f e
+  _ -> toFile PNG f e
 
 evalFull :: MonadLogo m => [Comm] -> [Exp] -> m ()
 evalFull [] _ = return ()
