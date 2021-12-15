@@ -194,14 +194,6 @@ returnP a _ _ _ = Right a
 failP :: String -> P a
 failP err _ _ _ = Left err
 
-catchP :: P a -> (String -> P a) -> P a
-catchP m k s l c =
-  case m s l c of
-    Right a -> Right a
-    Left e -> k e s l c
-
-
-
 parseError :: Token -> P a
 parseError t = getLineNo `thenP`
                \line -> getCharNo `thenP`
@@ -274,6 +266,7 @@ data Token = TokenFd
            | TokenLabel
            | TokenLabelS
            | TokenEOF
+           | TokenDot
 
 lexerP :: (Token -> P a) -> P a
 lexerP cont str line char =
@@ -313,9 +306,16 @@ lexStr cs = (str, rest, n)
             where (str, rest) = span isAlphaNum cs
                   n = length str
 
-lexNum cs = (TokenNum (read num), rest, n)
-      where (num, rest) = span (\d -> isDigit d || d == '.') cs
-            n = length num
+lexNum cs = let (num, rest) = span isDigit cs
+                n = length num in
+            case rest of
+            '.':xs -> let (num', rest') = span isDigit xs in
+                      case num' of
+                        [] -> (TokenDot, rest, n + 1)
+                        _ -> case rest' of -- Esta sección es por querer soportar los float sin 0
+                              '.':ys -> (TokenDot, ys, n + 2)
+                              _ -> (TokenNum (read $ num ++ '.' : num'), rest', n + 1 + length num')
+            _ -> (TokenNum (read num), rest, n)
 
 lexVar cs =
   case span (\x -> isAlphaNum x || x == '.') cs of
@@ -433,4 +433,5 @@ unLexer TokenArc = "arc"
 unLexer TokenLabel = "label"
 unLexer TokenLabelS = "setlabelheight"
 unLexer TokenEOF = "Fin del archivo"
+unLexer TokenDot = "\'.\'"
 }
