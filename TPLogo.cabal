@@ -27,7 +27,6 @@ source-repository head
 library
   exposed-modules:
       Common
-      Either3
       Eval
       GlobalEnv
       Lib

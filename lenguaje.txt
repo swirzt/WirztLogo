@@ -1,10 +1,10 @@
 Sintaxis del lenguaje
 
 Comm ::= Comm Comm 
-       | forward Value | fd Value
-       | back Value | bk Value
-       | right Value | rt Value
-       | left Value | lt Value
+       | forward Exp | fd Exp
+       | back Exp | bk Exp
+       | right Exp | rt Exp
+       | left Exp | lt Exp
        | clearscreen | cs
        | clean
        | penup | pu
@@ -12,56 +12,49 @@ Comm ::= Comm Comm
        | hideturtle | ht
        | showturtle | st
        | home
-       | setx Value | sety Value | setxy Value Value
-       | setheading Value | seth Value
-       | repeat Value [Comm]
-       | print Value
-       | print Bool
-       | setcolor Value
-       | for [str i f s] [Comm]
-       | if Bool [Comm] [Comm]
-       | to String Args [Comm] end
-       | make String Value
-       | wait Value
-       | do.while [Comm] Bool
-       -- | fill
-       -- | filled Exp [Comm] Muy dificiles de implementar
-
-----No estoy haciendo listas----
-List ::= []
-       | :var
-       | 
-       -- | butfirst List
-       -- | butlast List
-
-Value ::= Float
+       | setx Exp | sety Exp | setxy Exp Exp
+       | setheading Exp | seth Exp
+       | repeat Exp [Comm]
+       | print Exp
+       | print String
+       | setcolor Exp
+       | for [str Exp Exp Exp] [Comm]
+       | for [str Exp Exp] [Comm]
+       | if Exp [Comm] [Comm]
+       | to String Args Comm end
+       | make String Exp
+       | wait Exp
+       | do.while [Comm] Exp
+       | while Exp [Comm]
+       | Strin [Exp]
+       | scale Exp
+       | arc Exp Exp
+       | label Str
+       | setlabelheight Exp
+       | skip
+       
+Exp ::= Float
+        | - Exp
         | xcor | ycor
         | heading
-        | towards Value Value
+        | towards Exp Exp
         | :var
-        | Value + Value
-        | Value - Value
-        | Value * Value
-        | Value / Value
-        | readword -- Siempre lee un número
-        | if Bool Value Value
-        | ( Value )
-        -- | first List
-        -- | last List
-        -- | item Exp List
-        -- | pick List
-
-
-Bool ::= Value > Value
-       | Value < Value
-       | Value = Value
-       | Value <= Value
-       | Value >= Value
-       | Value != Value
-       | Bool && Bool
-       | Bool || Bool
-       | not Bool
-       | true
-       | false
-       | ( Bool )
-       -- | empty? List
+        | Exp + Exp
+        | Exp - Exp
+        | Exp * Exp
+        | Exp / Exp
+        | readword -- Lee una Exp de consola
+        | if Exp Exp Exp
+        | Exp > Exp
+        | Exp < Exp
+        | Exp = Exp
+        | Exp <= Exp
+        | Exp >= Exp
+        | Exp != Exp
+        | Exp && Exp
+        | Exp || Exp
+        | not Exp
+        | true
+        | false
+        | random Exp -- Número random entre 0 y Exp
+        | ( Exp )

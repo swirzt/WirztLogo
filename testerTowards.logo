@@ -9,3 +9,4 @@ for ["y 0 1 0.01] [make "z towards -1 (-1 + :y) if :z >= :temp [print :z seth :z
 for ["y 0 1 0.01] [make "z towards -1 :y if :z >= :temp [print :z seth :z] [print "ohoh] make "temp :z]
 for ["x 0 1 0.01] [make "z towards (-1 + :x) 1 if :z >= :temp [print :z seth :z] [print "ohoh] make "temp :z]
 print "listo
+print "sd

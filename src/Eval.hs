@@ -165,27 +165,6 @@ bool2Float :: MonadLogo m => Bool -> m Float
 bool2Float True = return 1
 bool2Float False = return 0
 
-binaryReplace :: MonadLogo m => [Exp] -> Exp -> Exp -> (Exp -> Exp -> g) -> m g
-binaryReplace e e1 e2 f = do
-  ee1 <- replace e e1
-  ee2 <- replace e e2
-  return $ f ee1 ee2
-
-replace :: MonadLogo m => [Exp] -> Exp -> m Exp
-replace e (Negative expp) = replace e expp <&> Negative
-replace e (Towards e1 e2) = binaryReplace e e1 e2 Towards
-replace _ (Var n) = getVar n <&> Num
-replace e (BinaryOp f x y) = binaryReplace e x y (BinaryOp f)
-replace e (IfE eb et ef) = do
-  eeb <- replace e eb
-  eet <- replace e et
-  eef <- replace e ef
-  return $ IfE eeb eet eef
-replace e (Access i) = replace e $ e !! i
-replace e (Compare f e1 e2) = binaryReplace e e1 e2 (Compare f)
-replace e (Not expp) = replace e expp <&> Not
-replace _ t = return t
-
 cuadrante :: Float -> Float -> Float -> Float
 cuadrante rad x y =
   if x >= 0

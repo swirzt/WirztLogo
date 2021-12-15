@@ -2,6 +2,7 @@
 module LogoPar where
 import Common
 import Data.Char
+import Debug.Trace
 }
 
 %name logoComm CommSeq
@@ -272,6 +273,7 @@ lexerP :: (Token -> P a) -> P a
 lexerP cont str line char =
       case str of
             [] -> cont TokenEOF str line char
+            '\r':strr -> lexerP cont strr line char -- Siempre le sigue un \n
             '\n':strr -> lexerP cont strr (line + 1) 0
             _ -> let (t, strr, charr) = lexer str in cont t strr line (char + charr)
 

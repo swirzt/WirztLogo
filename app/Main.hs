@@ -17,10 +17,11 @@ import Graphics.Gloss (Display (..), Picture, pictures, scale, white)
 import Graphics.Gloss.Export (GifLooping (LoopingForever), exportPictureToPNG, exportPicturesToGif)
 import Graphics.Gloss.Interface.IO.Simulate (simulateIO)
 import Lib (comm2Bound, getTortu, parserComm)
-import MonadLogo (runLogo)
+import MonadLogo (MonadLogo, runLogo)
 import SimpleGetOpt (ArgDescr (NoArg, ReqArg), OptDescr (Option), OptSpec (..), getOpts)
 import System.Console.Haskeline (InputT, defaultSettings, getInputLine, runInputT)
 import System.Exit (exitSuccess)
+import System.FilePath.Windows (takeExtension)
 import System.Random (StdGen, initStdGen)
 import Text.Read (readMaybe)
 
@@ -74,7 +75,8 @@ step _ _ (Just xs, e) = evalStepComm e xs
 toFile :: FileType -> FilePath -> Env -> IO ()
 toFile PNG f e =
   let size = toSave e
-      picss = pictures $ reverse $ pics e
+      esc = escala e
+      picss = scale esc esc $ pictures $ reverse $ pics e
    in exportPictureToPNG size white f picss
 toFile GIF f e =
   let size = toSave e
@@ -83,19 +85,21 @@ toFile GIF f e =
       n = length pcs
    in exportPicturesToGif 1 LoopingForever size white f (\x -> scale esc esc $ pictures $ take (floorFloatInt x) pcs) [0 .. (fromIntegral n)]
 
+data Mode = Interactive | CompileFile deriving (Show)
+
 data Argumentos = Argumentos
   { fullscreen :: Bool,
     width :: Int,
     height :: Int,
     refresh :: Int,
+    mode :: Mode,
     files :: [FilePath]
   }
-  deriving (Show)
 
 options :: OptSpec Argumentos
 options =
   OptSpec
-    { progDefaults = Argumentos False 300 300 60 [],
+    { progDefaults = Argumentos False 300 300 60 Interactive [],
       progOptions =
         [ Option
             ['f']
@@ -125,7 +129,16 @@ options =
             $ ReqArg "NUM" $ \a s ->
               case readMaybe a of
                 Just n | n > 0 -> Right s {refresh = n}
-                _ -> Left "Valor inválido para 'refresh'"
+                _ -> Left "Valor inválido para 'refresh'",
+          Option
+            ['m']
+            ["mode"]
+            "Define el modo de funcionamiento del sistema, por defecto es interactivo."
+            $ ReqArg "CHAR" $ \a s ->
+              case a of
+                'i' : _ -> Right s {mode = Interactive}
+                'c' : _ -> Right s {mode = CompileFile}
+                _ -> Left "Valor inválido para 'modo'"
         ],
       progParamDocs =
         [("FILES", "Los archivos que se quieran evaluar.")],
@@ -136,12 +149,14 @@ main :: IO ()
 main = do
   args <- getOpts options
   let d = case args of
-        Argumentos True _ _ _ _ -> FullScreen
-        Argumentos False w h _ _ -> makeWindow w h
+        Argumentos True _ _ _ _ _ -> FullScreen
+        Argumentos False w h _ _ _ -> makeWindow w h
   entrada <- newEmptyMVar
   salida <- newEmptyMVar
   g <- initStdGen
-  runProgram d g entrada salida args
+  case mode args of
+    Interactive -> runProgramI d g entrada salida args
+    CompileFile -> runProgramC d g entrada salida args
 
 getFile :: FilePath -> IO String
 getFile f =
@@ -190,21 +205,29 @@ waiter i o = do
     GetExp -> inputExp i o
     Error xs -> liftIO (putStrLn xs) >> consola i o
     Show xs -> liftIO (putStrLn xs) >> waiter i o
+    End -> return ()
 
 hiloConsola :: MVar Input -> MVar Output -> IO ()
 hiloConsola i o = runInputT defaultSettings (waiter i o)
 
-runProgram :: Display -> StdGen -> MVar Input -> MVar Output -> Argumentos -> IO ()
-runProgram d g i o args
+runProgramI :: Display -> StdGen -> MVar Input -> MVar Output -> Argumentos -> IO ()
+runProgramI d g i o args
   | null (files args) = noComm d g i o args
   | otherwise =
-    mapM getFile (files args) >>= \s -> case parserComm $ concat s of
-      Left _ -> putStrLn "Parse error en archivos" >> noComm d g i o args
-      Right cms ->
-        let cms' = map (comm2Bound []) cms
-         in eval1st cms' g i o (width args, height args) >>= \case
-              Left str -> print str
-              Right (m, e) -> when (isNothing m) (putMVar o Ready) >> forkRun d m e i o (refresh args)
+    compileFiles (files args) >>= \cms ->
+      let cms' = map (comm2Bound []) cms
+       in eval1st cms' g i o (width args, height args) >>= \case
+            Left str -> print str
+            Right (m, e) -> when (isNothing m) (putMVar o Ready) >> forkRun d m e i o (refresh args)
+
+compileFiles :: [FilePath] -> IO [Comm]
+compileFiles [] = return []
+compileFiles (x : xs) =
+  getFile x >>= \case
+    "" -> compileFiles xs
+    ys -> case parserComm ys of
+      Left err -> putStrLn (err ++ " En el archivo: " ++ x ++ ".") >> return []
+      Right zs -> compileFiles xs >>= return . (zs ++)
 
 noComm :: Display -> StdGen -> MVar Input -> MVar Output -> Argumentos -> IO ()
 noComm d g i o args = putMVar o Ready >> forkRun d Nothing (defaultEnv g i o (width args, height args)) i o (refresh args)
@@ -219,3 +242,39 @@ eval1st (x : xs) g i o s =
    in runLogo (defaultEnv g i o s) (eval [] x) >>= \zs -> case zs of
         Left _ -> return zs
         Right (m, e) -> return $ Right (Just $ maybe ys (++ ys) m, e)
+
+runProgramC :: Display -> StdGen -> MVar Input -> MVar Output -> Argumentos -> IO ()
+runProgramC d g i o args = case files args of
+  [] -> putStrLn "No se ingresó ningun archivo para el modo de Compilado."
+  xs ->
+    compileFiles xs >>= \case
+      [] -> return ()
+      ys ->
+        forkIO (hiloConsola i o)
+          >> let zs = map (comm2Bound []) ys
+              in runLogo (defaultEnv g i o (width args, height args)) (evalFull zs []) >>= \case
+                   Left str -> putMVar o $ Error str
+                   Right (_, e) -> save2File e i o
+
+save2File :: Env -> MVar Input -> MVar Output -> IO ()
+save2File e i o = do
+  putMVar o $ Show "Ingrese el nombre del archivo"
+  putMVar o Ready
+  s <- takeMVar i
+  case s of
+    Input ss ->
+      let f = takeWhile (not . isSpace) $ dropWhile isSpace ss
+          ext = takeExtension f
+       in case ext of
+            ".gif" -> toFile GIF f e
+            _ -> toFile PNG f e
+    _ -> save2File e i o
+
+evalFull :: MonadLogo m => [Comm] -> [Exp] -> m ()
+evalFull [] _ = return ()
+evalFull (x : xs) e =
+  eval e x >>= \m -> maybe (return ()) evalFull' m >> evalFull xs e
+
+evalFull' :: MonadLogo m => [([Exp], Comm)] -> m ()
+evalFull' [] = return ()
+evalFull' ((e, c) : xs) = evalFull [c] e >> evalFull' xs

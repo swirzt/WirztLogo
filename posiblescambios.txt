@@ -1,4 +1,4 @@
 hacer que el wait modifique el estado en vez de usar thread.delay
 Cambiar ancho de dibujo (Usar rectangle Path)
-cambio de forma (dibujar formitas) (talVez bitmap)
-Modos de correr programa (interactivo, solo imprimir archivo)
+cambio de forma (dibujar leon, perro, etc) (talVez bitmap)
+revisar el arc

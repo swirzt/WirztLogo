@@ -25,9 +25,7 @@ failLogo :: MonadLogo m => String -> m a
 failLogo = throwError
 
 showLogo :: (MonadLogo m, Show a) => a -> m ()
-showLogo a = do
-  s <- get
-  liftIO $ putMVar (out s) (Show (Prelude.show a))
+showLogo a = printLogo $ Prelude.show a
 
 printLogo :: MonadLogo m => String -> m ()
 printLogo str = do
