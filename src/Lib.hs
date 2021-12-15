@@ -13,24 +13,17 @@ module Lib
 where
 
 import Common (Comm (..), Exp (..))
+import Data.Char (toLower)
 import Data.List (elemIndex)
-import Either3 (either3)
 import Graphics.Gloss
 import Graphics.Gloss.Geometry.Angle (degToRad, normalizeAngle, radToDeg)
-import LogoPar (lexer, logo)
+import LogoPar (logoComm, logoExp)
 
-nothing :: a -> Maybe b
-nothing = const Nothing
+parserExp :: String -> Either String Exp
+parserExp s = logoExp (map toLower s) 0 0
 
-parserExp :: String -> Maybe Exp
-parserExp s =
-  let ys = logo $ lexer s
-   in either3 nothing Just nothing ys
-
-parserComm :: String -> Maybe [Comm]
-parserComm s =
-  let ys = logo $ lexer s
-   in either3 nothing nothing Just ys
+parserComm :: String -> Either String [Comm]
+parserComm s = logoComm (map toLower s) 0 0
 
 binaryOp :: (a -> b -> b) -> a -> b -> b -> (b -> b -> c) -> c
 binaryOp f v e1 e2 g =
@@ -151,18 +144,18 @@ num2color :: Int -> Color
 num2color i = case i of
   0 -> black
   1 -> blue
-  2 -> customColor 0 255 0
+  2 -> customColor 0 255 0 -- lime
   3 -> cyan
   4 -> red
   5 -> magenta
   6 -> yellow
   7 -> white
-  8 -> customColor 165 42 42
-  9 -> customColor 210 180 140
+  8 -> customColor 165 42 42 -- brown
+  9 -> customColor 210 180 140 -- tan
   10 -> green
   11 -> aquamarine
-  12 -> customColor 250 128 114
-  13 -> customColor 128 0 128
+  12 -> customColor 250 128 114 -- salmon
+  13 -> customColor 128 0 128 -- purple
   14 -> orange
-  15 -> customColor 128 128 128
+  15 -> customColor 128 128 128 -- gray
   _ -> undefined

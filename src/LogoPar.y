@@ -2,12 +2,14 @@
 module LogoPar where
 import Common
 import Data.Char
-import Either3
 }
 
-%name logo
+%name logoComm CommSeq
+%name logoExp Exp
 %tokentype { Token }
 %error { parseError }
+%monad { P } { thenP } { returnP }
+%lexer { lexerP } { TokenEOF }
 
 %token
       fordward          { TokenFd }
@@ -83,11 +85,6 @@ import Either3
 
 
 %%
-Par :: { Either3 String Exp [Comm] }
-Par : Exp          { Medio $1 }
-    | CommSeq      { Der $1 }
-    | error        { Izq "Error de parseo" }
-
 CommSeq :: { [Comm] }
 CommSeq : CommSeqR           { reverse $1 }
 
@@ -177,8 +174,44 @@ Exp : num                  { Num $1 }
     | '(' Exp ')'          { $2 }
 
 {
-parseError :: [Token] -> a
-parseError _ = error "Parse error"
+type LineNumber = Int
+type CharNumber = Int
+
+type P a = String -> LineNumber -> CharNumber -> Either String a
+
+getLineNo :: P LineNumber
+getLineNo _ l _ = Right l
+
+getCharNo :: P CharNumber
+getCharNo _ _ c = Right c
+
+thenP :: P a -> (a -> P b) -> P b
+m `thenP` k = \s l c -> m s l c >>= \a -> k a s l c
+
+returnP :: a -> P a
+returnP a _ _ _ = Right a
+
+failP :: String -> P a
+failP err _ _ _ = Left err
+
+catchP :: P a -> (String -> P a) -> P a
+catchP m k s l c =
+  case m s l c of
+    Right a -> Right a
+    Left e -> k e s l c
+
+
+
+parseError :: Token -> P a
+parseError t = getLineNo `thenP`
+               \line -> getCharNo `thenP`
+               \char -> failP ("Error de parseo en pos (" ++
+                              show line ++
+                              ", " ++
+                              show char ++
+                              ").\nEn el token de: " ++
+                              unLexer t ++
+                              ".")
 
 data Token = TokenFd
            | TokenBk 
@@ -211,7 +244,6 @@ data Token = TokenFd
            | TokenYCor
            | TokenHead
            | TokenTow 
-           | TokenRef 
            | TokenRead 
            | TokenVarE String
            | TokenVarC String
@@ -241,99 +273,164 @@ data Token = TokenFd
            | TokenArc
            | TokenLabel
            | TokenLabelS
-           
+           | TokenEOF
 
-lexer :: String -> [Token]
-lexer = lexer' . map toLower
+lexerP :: (Token -> P a) -> P a
+lexerP cont str line char =
+      case str of
+            [] -> cont TokenEOF str line char
+            '\n':strr -> lexerP cont strr (line + 1) 0
+            _ -> let (t, strr, charr) = lexer str in cont t strr line (char + charr)
 
-lexer' :: String -> [Token]
-lexer' [] = []
-lexer' s@(c:cs) 
-      | isSpace c = lexer' cs
+lexer :: String -> (Token, String, Int)
+lexer s@(c:cs) 
+      | isSpace c = let (t,ss,cc) = lexer cs in (t, ss, cc+1)
       | isAlpha c = lexVar s
       | isDigit c = lexNum s
-lexer' s@('.':c:cs) | isDigit c = lexNum ('0':s)
-lexer' ('"':cs) = let (str, rest) = lexStr cs
-                  in TokenStr str : rest
-lexer' (':':cs) = let (str, rest) = lexStr cs
-                  in TokenVarE str : rest
-lexer' ('>':'=':cs) = TokenMaIgual : lexer' cs
-lexer' ('<':'=':cs) = TokenMeIgual : lexer' cs
-lexer' ('!':'=':cs) = TokenNoIgual : lexer' cs
-lexer' ('>':cs) = TokenMayor : lexer' cs
-lexer' ('<':cs) = TokenMenor : lexer' cs
-lexer' ('=':cs) = TokenIgual : lexer' cs
-lexer' ('(':cs) = TokenPA : lexer' cs
-lexer' (')':cs) = TokenPC : lexer' cs
-lexer' ('[':cs) = TokenCA : lexer' cs
-lexer' (']':cs) = TokenCC : lexer' cs
-lexer' ('*':cs) = TokenMul : lexer' cs
-lexer' ('/':cs) = TokenDiv : lexer' cs
-lexer' ('+':cs) = TokenSum : lexer' cs
-lexer' ('-':cs) = TokenDiff : lexer' cs
--- if isDigit n then TokenNeg : lexnum (n:cs) else TokenDiff : lexer' (n:cs)
-lexer' ('&':'&':cs) = TokenY : lexer' cs
-lexer' ('|':'|':cs) = TokenO : lexer' cs
+lexer s@('.':c:cs) | isDigit c = lexNum ('0':s)
+lexer ('"':cs) = let (str, rest, n) = lexStr cs
+                  in (TokenStr str, rest, n+1)
+lexer (':':cs) = let (str, rest, n) = lexStr cs
+                  in (TokenVarE str, rest, n+1)
+lexer ('>':'=':cs) = (TokenMaIgual, cs, 2)
+lexer ('<':'=':cs) = (TokenMeIgual, cs, 2)
+lexer ('!':'=':cs) = (TokenNoIgual, cs, 2)
+lexer ('>':cs) = (TokenMayor, cs, 1)
+lexer ('<':cs) = (TokenMenor, cs, 1)
+lexer ('=':cs) = (TokenIgual, cs, 1)
+lexer ('(':cs) = (TokenPA, cs, 1)
+lexer (')':cs) = (TokenPC, cs, 1)
+lexer ('[':cs) = (TokenCA, cs, 1)
+lexer (']':cs) = (TokenCC, cs, 1)
+lexer ('*':cs) = (TokenMul, cs, 1)
+lexer ('/':cs) = (TokenDiv, cs, 1)
+lexer ('+':cs) = (TokenSum, cs, 1)
+lexer ('-':cs) = (TokenDiff, cs, 1)
+lexer ('&':'&':cs) = (TokenY, cs, 2)
+lexer ('|':'|':cs) = (TokenO, cs, 2)
 
-lexStr cs = (str, lexer' rest)
-      where (str, rest) = span isAlphaNum cs
+lexStr cs = (str, rest, n)
+            where (str, rest) = span isAlphaNum cs
+                  n = length str
 
-lexNum cs = TokenNum (read num) : lexer' rest
-      where (num,rest) = span (\d -> isDigit d || d == '.') cs
+lexNum cs = (TokenNum (read num), rest, n)
+      where (num, rest) = span (\d -> isDigit d || d == '.') cs
+            n = length num
 
 lexVar cs =
   case span (\x -> isAlphaNum x || x == '.') cs of
-      ("fordward",rest) -> TokenFd : lexer' rest
-      ("fd",rest) -> TokenFd : lexer' rest
-      ("back",rest) -> TokenBk : lexer' rest
-      ("bk",rest) -> TokenBk : lexer' rest
-      ("right",rest) -> TokenRt : lexer' rest
-      ("rt",rest) -> TokenRt : lexer' rest
-      ("left",rest) -> TokenLt : lexer' rest
-      ("lt",rest) -> TokenLt : lexer' rest
-      ("clearscreen",rest) -> TokenCs : lexer' rest
-      ("cs",rest) -> TokenCs : lexer' rest
-      ("clean",rest) -> TokenCl : lexer' rest
-      ("penup",rest) -> TokenPu : lexer' rest
-      ("pu",rest) -> TokenPu : lexer' rest
-      ("pendown",rest) -> TokenPd : lexer' rest
-      ("pd",rest) -> TokenPd : lexer' rest
-      ("hideturtle",rest) -> TokenHt : lexer' rest
-      ("ht",rest) -> TokenHt : lexer' rest
-      ("showturtle",rest) -> TokenSt : lexer' rest
-      ("st",rest) -> TokenSt : lexer' rest
-      ("home",rest) -> TokenHome : lexer' rest
-      ("setx",rest) -> TokenStx : lexer' rest
-      ("sety",rest) -> TokenSty : lexer' rest
-      ("setxy",rest) -> TokenStxy : lexer' rest
-      ("setheading",rest) -> TokenSeth : lexer' rest
-      ("seth",rest) -> TokenSeth : lexer' rest
-      ("repeat",rest) -> TokenRep : lexer' rest
-      ("print",rest) -> TokenPrnt : lexer' rest
-      ("to",rest) -> TokenTo : lexer' rest
-      ("end",rest) -> TokenEnd : lexer' rest
-      ("setcolor",rest) -> TokenSetCo : lexer' rest
-      ("make",rest) -> TokenMk : lexer' rest
-      ("for",rest) -> TokenFor : lexer' rest
-      ("if",rest) -> TokenIf : lexer' rest
-      ("wait",rest) -> TokenWait : lexer' rest
-      ("do.while",rest) -> TokenDoWhile : lexer' rest
-      ("while",rest) -> TokenWhile : lexer' rest
-      ("skip",rest) -> TokenSkip : lexer' rest
-      ("xcor",rest) -> TokenXCor : lexer' rest
-      ("ycor",rest) -> TokenYCor : lexer' rest
-      ("heading",rest) -> TokenHead : lexer' rest
-      ("towards",rest) -> TokenTow : lexer' rest
-      ("readword",rest) -> TokenRead : lexer' rest
-      ("not",rest) -> TokenNo : lexer' rest
-      ("true",rest) -> TokenTrue : lexer' rest
-      ("false",rest) -> TokenFalse : lexer' rest
-      ("scale",rest) -> TokenScale : lexer' rest
-      ("random",rest) -> TokenRandom : lexer' rest
-      ("arc",rest) -> TokenArc : lexer' rest
-      ("label",rest) -> TokenLabel : lexer' rest
-      ("setlabelheight",rest) -> TokenLabelS : lexer' rest
-      (var,rest) -> TokenVarC var : lexer' rest
+      ("fordward",rest) -> (TokenFd, rest, 8)
+      ("fd",rest) -> (TokenFd, rest, 2)
+      ("back",rest) -> (TokenBk, rest, 4)
+      ("bk",rest) -> (TokenBk, rest, 2)
+      ("right",rest) -> (TokenRt, rest, 5)
+      ("rt",rest) -> (TokenRt, rest, 2)
+      ("left",rest) -> (TokenLt, rest, 4)
+      ("lt",rest) -> (TokenLt, rest, 2)
+      ("clearscreen",rest) -> (TokenCs, rest, 11)
+      ("cs",rest) -> (TokenCs, rest, 2)
+      ("clean",rest) -> (TokenCl, rest, 5)
+      ("penup",rest) -> (TokenPu, rest, 5)
+      ("pu",rest) -> (TokenPu, rest, 2)
+      ("pendown",rest) -> (TokenPd, rest, 7)
+      ("pd",rest) -> (TokenPd, rest, 2)
+      ("hideturtle",rest) -> (TokenHt, rest, 10)
+      ("ht",rest) -> (TokenHt, rest, 2)
+      ("showturtle",rest) -> (TokenSt, rest, 10)
+      ("st",rest) -> (TokenSt, rest, 2)
+      ("home",rest) -> (TokenHome, rest, 4)
+      ("setx",rest) -> (TokenStx, rest, 4)
+      ("sety",rest) -> (TokenSty, rest, 4)
+      ("setxy",rest) -> (TokenStxy, rest, 5)
+      ("setheading",rest) -> (TokenSeth, rest, 10)
+      ("seth",rest) -> (TokenSeth, rest, 4)
+      ("repeat",rest) -> (TokenRep, rest, 6)
+      ("print",rest) -> (TokenPrnt, rest, 5)
+      ("to",rest) -> (TokenTo, rest, 2)
+      ("end",rest) -> (TokenEnd, rest, 3)
+      ("setcolor",rest) -> (TokenSetCo, rest, 8)
+      ("make",rest) -> (TokenMk, rest, 4)
+      ("for",rest) -> (TokenFor, rest, 3)
+      ("if",rest) -> (TokenIf, rest, 2)
+      ("wait",rest) -> (TokenWait, rest, 4)
+      ("do.while",rest) -> (TokenDoWhile, rest, 8)
+      ("while",rest) -> (TokenWhile, rest, 5)
+      ("skip",rest) -> (TokenSkip, rest, 5)
+      ("xcor",rest) -> (TokenXCor, rest, 4)
+      ("ycor",rest) -> (TokenYCor, rest, 4)
+      ("heading",rest) -> (TokenHead, rest, 7)
+      ("towards",rest) -> (TokenTow, rest, 7)
+      ("readword",rest) -> (TokenRead, rest, 8)
+      ("not",rest) -> (TokenNo, rest, 3)
+      ("true",rest) -> (TokenTrue, rest, 4)
+      ("false",rest) -> (TokenFalse, rest, 5)
+      ("scale",rest) -> (TokenScale, rest, 5)
+      ("random",rest) -> (TokenRandom, rest, 6)
+      ("arc",rest) -> (TokenArc, rest, 3)
+      ("label",rest) -> (TokenLabel, rest, 5)
+      ("setlabelheight",rest) -> (TokenLabelS, rest, 14)
+      (var,rest) -> (TokenVarC var, rest, length var)
 
-
+unLexer :: Token -> String
+unLexer TokenFd = "fd"
+unLexer TokenBk = "bk"
+unLexer TokenRt = "rt"
+unLexer TokenLt = "lt"
+unLexer TokenCs = "cs"
+unLexer TokenCl = "clean"
+unLexer TokenPu = "pu"
+unLexer TokenPd = "pd"
+unLexer TokenHt = "ht"
+unLexer TokenSt = "st"
+unLexer TokenHome = "home"
+unLexer TokenStx = "setx"
+unLexer TokenSty  = "sety"
+unLexer TokenStxy  = "setxy"
+unLexer TokenSeth = "seth"
+unLexer TokenRep  = "repeat"
+unLexer TokenPrnt  = "print"
+unLexer TokenTo  = "to"
+unLexer TokenEnd  = "end"
+unLexer TokenSetCo  = "setcolor"
+unLexer TokenMk   = "make"
+unLexer TokenFor   = "for"
+unLexer TokenIf = "if"
+unLexer TokenWait  = "wait"
+unLexer TokenWhile = "while"
+unLexer TokenDoWhile = "do.while"
+unLexer TokenSkip = "skip"
+unLexer TokenXCor  = "xcor"
+unLexer TokenYCor = "ycor"
+unLexer TokenHead = "heading"
+unLexer TokenTow  = "towards"
+unLexer TokenRead  = "readword"
+unLexer (TokenVarE str) = ':' : str
+unLexer (TokenVarC str) = str
+unLexer (TokenNum f) = show f
+unLexer (TokenStr str) = '\"':str
+unLexer TokenPA  = "("
+unLexer TokenPC  = ")"
+unLexer TokenCA  = "["
+unLexer TokenCC  = "]"
+unLexer TokenMayor  = ">"
+unLexer TokenMenor  = "<"
+unLexer TokenIgual  = "="
+unLexer TokenMaIgual = ">="
+unLexer TokenMeIgual = "<="
+unLexer TokenNoIgual = "!="
+unLexer TokenY = "&&"
+unLexer TokenO = "||"
+unLexer TokenNo = "not"
+unLexer TokenMul = "*"
+unLexer TokenDiv = "/"
+unLexer TokenSum = "+"
+unLexer TokenDiff = "-"
+unLexer TokenTrue = "true"
+unLexer TokenFalse = "false"
+unLexer TokenScale = "scale"
+unLexer TokenRandom = "random"
+unLexer TokenArc = "arc"
+unLexer TokenLabel = "label"
+unLexer TokenLabelS = "setlabelheight"
+unLexer TokenEOF = "Fin del archivo"
 }

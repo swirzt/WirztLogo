@@ -57,15 +57,15 @@ step _ _ m@(Nothing, e) = do
     Nothing -> return m
     Just Exit -> exitSuccess -- Todo el programa termina
     Just (Input xs) -> case parserComm xs of
-      Nothing -> putMVar (out e) (Error "Parse error") >> return m
-      Just [] -> putMVar (out e) Ready >> return m
-      Just ys -> evalStepComm e $ map (\c -> ([], comm2Bound [] c)) ys
+      Left err -> putMVar (out e) (Error err) >> return m
+      Right [] -> putMVar (out e) Ready >> return m
+      Right ys -> evalStepComm e $ map (\c -> ([], comm2Bound [] c)) ys
     Just (ToFile ft xs) -> toFile ft xs e >> exitSuccess -- Quería poder seguir después de guardar pero da error
     Just (LoadFile xs) ->
       getFile xs >>= \zs -> case parserComm zs of
-        Nothing -> putMVar (out e) (Error $ "Parse error en archivo: " ++ xs) >> return m
-        Just [] -> putMVar (out e) Ready >> return m
-        Just ys -> evalStepComm e $ map (\c -> ([], comm2Bound [] c)) ys
+        Left err -> putMVar (out e) (Error $ err ++ " En el archivo: " ++ xs) >> return m
+        Right [] -> putMVar (out e) Ready >> return m
+        Right ys -> evalStepComm e $ map (\c -> ([], comm2Bound [] c)) ys
     Just ListV -> let v = showVars e in putMVar (out e) (Show v) >> putMVar (out e) Ready >> return m
     Just ListC -> let c = showComm e in putMVar (out e) (Show c) >> putMVar (out e) Ready >> return m
 step _ _ (Just [], e) = putMVar (out e) Ready >> return (Nothing, e)
@@ -199,8 +199,8 @@ runProgram d g i o args
   | null (files args) = noComm d g i o args
   | otherwise =
     mapM getFile (files args) >>= \s -> case parserComm $ concat s of
-      Nothing -> putStrLn "Parse error en archivos" >> noComm d g i o args
-      Just cms ->
+      Left _ -> putStrLn "Parse error en archivos" >> noComm d g i o args
+      Right cms ->
         let cms' = map (comm2Bound []) cms
          in eval1st cms' g i o (width args, height args) >>= \case
               Left str -> print str

@@ -223,8 +223,8 @@ runExp e (BinaryOp f x y) = binary e x y (getNumOp f)
 runExp e Read = do
   input <- getInput "Ingrese una exp"
   case parserExp input of
-    Nothing -> printLogo "Ingreso incorrecto, ingrese nuevamente." >> runExp e Read
-    Just i -> runExp e i
+    Left err -> printLogo ("Ingreso incorrecto, ingrese nuevamente.\n" ++ err) >> runExp e Read
+    Right i -> runExp e i
 runExp e (IfE eb et ef) = do
   b <- runExp e eb
   if ifF b
