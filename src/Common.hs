@@ -1,9 +1,19 @@
 module Common where
 
 -- Considero los booleanos como el lenguaje C
-data NumOps = Add | Sub | Mult | Div
+data NumOps = Add
+            | Sub
+            | Mult
+            | Div
 
-data BoolOps = Lt | Gt | Eq | GEq | LEq | Diff | And | Or
+data BoolOps = Lt
+             | Gt
+             | Eq
+             | GEq
+             | LEq
+             | Diff
+             | And
+             | Or
 
 ifF :: Float -> Bool
 ifF = (/= 0)
@@ -24,8 +34,8 @@ getBoolOp Diff = (/=)
 getBoolOp And = \x y -> ifF x && ifF y
 getBoolOp Or = \x y -> ifF x || ifF y
 
-data Exp
-  = Num Float
+data Exp =
+    Num Float
   | Negative Exp
   | XCor
   | YCor
@@ -42,8 +52,8 @@ data Exp
   | F
   | Random Exp
 
-data Comm
-  = Ford Exp
+data Comm =
+    Ford Exp
   | Back Exp
   | TRight Exp
   | TLeft Exp
@@ -77,17 +87,20 @@ data Comm
   | SetSizeTexto Exp
   | Skip -- Comando que no hace nada
 
-data Output = Ready | GetExp | Error String | Show String
+data Output = Ready
+            | GetExp
+            | Error String
+            | Show String
 
-data FileType = PNG | GIF
+data FileType = PNG
+              | GIF
 
-data Input
-  = Exit
-  | Input String
-  | ToFile FileType FilePath
-  | LoadFile FilePath
-  | ListV
-  | ListC
+data Input = Exit
+           | Input String
+           | ToFile FileType FilePath
+           | LoadFile FilePath
+           | ListV
+           | ListC
 
 -- printers
 instance Show NumOps where
@@ -121,20 +134,24 @@ isAtomExp F = True
 isAtomExp _ = False
 
 showAtomExp :: Exp -> String
-showAtomExp e = let se = show e in if isAtomExp e then se else "(" ++ se ++ ")"
+showAtomExp e = let se = show e
+                in if isAtomExp e
+                   then se
+                   else "(" ++ se ++ ")"
 
 instance Show Exp where
   show (Num f) = show f
-  show (Negative e) = '-' : show e
+  show (Negative e) = '-':show e
   show XCor = "xcor"
   show YCor = "ycor"
   show Heading = "heading"
   show (Towards e1 e2) = "tomards " ++ showAtomExp e1 ++ " " ++ showAtomExp e2
-  show (Var str) = ':' : str
+  show (Var str) = ':':str
   show (BinaryOp op e1 e2) = showAtomExp e1 ++ show op ++ showAtomExp e2
   show Read = "readword"
-  show (IfE e1 e2 e3) = "if " ++ showAtomExp e1 ++ " " ++ showAtomExp e2 ++ " " ++ showAtomExp e3
-  show (Access i) = '!' : show i
+  show (IfE e1 e2 e3) =
+    "if " ++ showAtomExp e1 ++ " " ++ showAtomExp e2 ++ " " ++ showAtomExp e3
+  show (Access i) = '!':show i
   show (Compare op e1 e2) = showAtomExp e1 ++ show op ++ showAtomExp e2
   show (Not e) = "not " ++ showAtomExp e
   show T = "true"
@@ -142,7 +159,8 @@ instance Show Exp where
   show (Random e) = "random " ++ showAtomExp e
 
 showCommList :: [Comm] -> String
-showCommList cs = "[" ++ dropEnd (foldr (\c str -> show c ++ " " ++ str) "" cs) 1 ++ "]"
+showCommList cs =
+  "[" ++ dropEnd (foldr (\c str -> show c ++ " " ++ str) "" cs) 1 ++ "]"
 
 instance Show Comm where
   show (Ford e) = "fd " ++ showAtomExp e
@@ -164,15 +182,41 @@ instance Show Comm where
   show (Print e) = "print " ++ showAtomExp e
   show (PrintStr str) = "print \"" ++ str
   show (SetCo e) = "setcolor " ++ showAtomExp e
-  show (IfC e cs1 cs2) = "if " ++ showAtomExp e ++ " " ++ showCommList cs1 ++ " " ++ showCommList cs2
-  show (Def str ss cs) = "to " ++ str ++ " " ++ concatMap (\s -> '\"' : s ++ " ") ss ++ showCommList cs
+  show (IfC e cs1 cs2) = "if "
+    ++ showAtomExp e
+    ++ " "
+    ++ showCommList cs1
+    ++ " "
+    ++ showCommList cs2
+  show (Def str ss cs) = "to "
+    ++ str
+    ++ " "
+    ++ concatMap (\s -> '\"':s ++ " ") ss
+    ++ showCommList cs
   show (Save str e) = "make \"" ++ str ++ " " ++ showAtomExp e
-  show (For str e1 e2 cs) = "for [\"" ++ str ++ " " ++ showAtomExp e1 ++ " " ++ showAtomExp e2 ++ "] " ++ showCommList cs
-  show (ForDelta str e1 e2 e3 cs) = "for [\"" ++ str ++ " " ++ showAtomExp e1 ++ " " ++ showAtomExp e2 ++ " " ++ showAtomExp e3 ++ "] " ++ showCommList cs
+  show (For str e1 e2 cs) = "for [\""
+    ++ str
+    ++ " "
+    ++ showAtomExp e1
+    ++ " "
+    ++ showAtomExp e2
+    ++ "] "
+    ++ showCommList cs
+  show (ForDelta str e1 e2 e3 cs) = "for [\""
+    ++ str
+    ++ " "
+    ++ showAtomExp e1
+    ++ " "
+    ++ showAtomExp e2
+    ++ " "
+    ++ showAtomExp e3
+    ++ "] "
+    ++ showCommList cs
   show (Wait e) = "wait " ++ showAtomExp e
   show (While e cs) = "while " ++ showAtomExp e ++ " " ++ showCommList cs
   show (DoWhile cs e) = "do.while " ++ showCommList cs ++ " " ++ showAtomExp e
-  show (CommVar str es) = str ++ " " ++ dropEnd (foldr (\e st -> showAtomExp e ++ " " ++ st) "" es) 1
+  show (CommVar str es) =
+    str ++ " " ++ dropEnd (foldr (\e st -> showAtomExp e ++ " " ++ st) "" es) 1
   show (ChangeScale e) = "scale " ++ showAtomExp e
   show (Arco e1 e2) = "arc " ++ showAtomExp e1 ++ " " ++ showAtomExp e2
   show (Texto str) = "label \"" ++ str
@@ -184,8 +228,7 @@ dropEnd l n = snd $ dropEnd' n l
   where
     dropEnd' :: Int -> [a] -> (Int, [a])
     dropEnd' p [] = (p, [])
-    dropEnd' p (x : xs) =
-      case dropEnd' p xs of
-        (0, ys) -> (0, x : ys)
-        (m, []) -> (m - 1, [])
-        _ -> undefined -- si m > 0 entonces la lista es vacía
+    dropEnd' p (x:xs) = case dropEnd' p xs of
+      (0, ys) -> (0, x:ys)
+      (m, []) -> (m - 1, [])
+      _       -> undefined -- si m > 0 entonces la lista es vacía
