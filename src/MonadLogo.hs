@@ -159,8 +159,8 @@ getComm str = do
       ("Comando: " ++ str ++ ", no está definido, no se puede acceder.")
     Just c  -> return c
 
-wait :: MonadLogo m => Int -> m ()
-wait = liftIO . threadDelay
+setWait :: MonadLogo m => Float -> m ()
+setWait f = modify (\s -> s { wait = True, acumWait = 0, limitWait = f })
 
 getRandom :: MonadLogo m => Float -> m Float
 getRandom n = do

@@ -1,2 +1,2 @@
-hacer que el wait modifique el estado en vez de usar thread.delay
 cambio de forma (dibujar leon, perro, etc) (talVez bitmap)
+Parseador de comandos de consola (como compi)

@@ -58,7 +58,13 @@ evalStepComm e ((ex, x):xs) = runLogo e (eval ex x)
                             in return (Just retComm, e')
 
 -- Avanza el modelo un paso
-step :: a -> b -> Model -> IO Model
+step :: a -> Float -> Model -> IO Model
+step _ f m@(n, e)
+  | wait e = let newAcum = acumWait e + (f * 1000)
+                 e' = if newAcum >= limitWait e
+                      then e { wait = False }
+                      else e { acumWait = newAcum }
+             in return (n, e')
 step _ _ m@(Nothing, e) = do
   input <- tryTakeMVar $ inp e -- Intenta leer de la MVar
   case input of

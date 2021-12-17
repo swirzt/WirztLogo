@@ -108,7 +108,7 @@ eval e (For str initt end xs) = forLoop e initt end xs (+ 1) (For str)
 eval e (ForDelta str initt end delta xs) = do
   fdelta <- runExp e delta
   forLoop e initt end xs (+ fdelta) (\e1 e2 -> ForDelta str e1 e2 (Num fdelta))
-eval e (Wait expp) = runExp e expp >>= wait . (* 1000) . floorFloatInt >> noth
+eval e (Wait expp) = runExp e expp >>= setWait >> noth
 eval e c@(While expp cs) = do
   b <- runExp e expp
   if ifF b

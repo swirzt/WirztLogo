@@ -20,6 +20,9 @@ data Env =
       , comms :: Map String (Int, [Comm])  -- Almacena las definiciones de Comandos en el entorno
       , escala :: Float  -- Cuanto se debe escalar la imagen
       , sizeT :: Float  -- Tamaño del texto generado con label
+      , wait :: Bool -- Si es True, el programa debe esperar limitWait milisegundos
+      , acumWait :: Float -- Tiempo transcurrido desde que se comenzó a esperar
+      , limitWait :: Float -- Tiempo limite de espera
       , random :: StdGen  -- Semilla para generación de numeros random
       , inp :: MVar Input  -- Variable de comunicación de entrada
       , out :: MVar Output  -- Variable de comunicación de salida
@@ -27,7 +30,7 @@ data Env =
       }
 
 defaultEnv :: StdGen -> MVar Input -> MVar Output -> (Int, Int) -> Env
-defaultEnv = Env 0 0 0 True False black [] empty empty 5 0.1
+defaultEnv = Env 0 0 0 True False black [] empty empty 5 0.1 False 0 0
 
 tupexp :: (String, Float) -> String
 tupexp (str, a) = str ++ ": " ++ Prelude.show a ++ "\n"
