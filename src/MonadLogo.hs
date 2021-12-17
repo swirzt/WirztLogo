@@ -74,6 +74,9 @@ addPicture p = do
 resetPics :: MonadLogo m => m ()
 resetPics = modify (\s -> s { pics = [] })
 
+undoPic :: MonadLogo m => m ()
+undoPic = modify (\s -> s { pics = tail $ pics s })
+
 setX :: MonadLogo m => Float -> m ()
 setX n = modify (\s -> s { posx = n })
 

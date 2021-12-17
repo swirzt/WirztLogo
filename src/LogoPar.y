@@ -45,6 +45,7 @@ import Debug.Trace
       arc               { TokenArc }
       label             { TokenLabel }
       labelS            { TokenLabelS }
+      undo              { TokenUndo }
       
 
       str               { TokenStr $$ }
@@ -128,6 +129,7 @@ Comm : fordward Exp                                { Ford $2 }
      | arc Exp Exp                                 { Arco $2 $3 }
      | label str                                   { Texto $2 }
      | labelS Exp                                  { SetSizeTexto $2 }
+     | undo                                        { Undo }
      | '(' Comm ')'                                { $2 }
 
 Args :: { [String] }
@@ -268,6 +270,8 @@ data Token = TokenFd
            | TokenLabelS
            | TokenEOF
            | TokenDot
+           | TokenUndo
+           | TokenCharError Char
 
 lexerP :: (Token -> P a) -> P a
 lexerP cont str line char =
@@ -303,6 +307,7 @@ lexer ('+':cs) = (TokenSum, cs, 1)
 lexer ('-':cs) = (TokenDiff, cs, 1)
 lexer ('&':'&':cs) = (TokenY, cs, 2)
 lexer ('|':'|':cs) = (TokenO, cs, 2)
+lexer (c:cs) = (TokenCharError c, cs, 1)
 
 lexStr cs = (str, rest, n)
             where (str, rest) = span isAlphaNum cs
@@ -371,6 +376,7 @@ lexVar cs =
       ("arc",rest) -> (TokenArc, rest, 3)
       ("label",rest) -> (TokenLabel, rest, 5)
       ("setlabelheight",rest) -> (TokenLabelS, rest, 14)
+      ("undo",rest) -> (TokenUndo, rest, 4)
       (var,rest) -> (TokenVarC var, rest, length var)
 
 unLexer :: Token -> String
@@ -436,4 +442,6 @@ unLexer TokenLabel = "label"
 unLexer TokenLabelS = "setlabelheight"
 unLexer TokenEOF = "Fin del archivo"
 unLexer TokenDot = "\'.\'"
+unLexer TokenUndo = "undo"
+unLexer (TokenCharError c) = show c
 }

@@ -223,6 +223,7 @@ consola i o = do
     Just ":q" -> exit i Exit
     Just ":v" -> sendI ListV i o
     Just ":c" -> sendI ListC i o
+    Just ":?" -> outputStrLn mensajeAyuda >> consola i o
     Just (':':'l':xs) -> case makeFileName xs of
       Nothing
         -> outputStrLn "No se otorgó un nombre de archivo" >> consola i o
@@ -236,6 +237,16 @@ consola i o = do
         -> outputStrLn "No se otorgó un nombre de archivo" >> consola i o
       Just ys -> exit i (ToFile PNG ys)
     Just x -> sendI (Input x) i o
+
+mensajeAyuda :: String
+mensajeAyuda = "Instrucciones:\n"
+  ++ "- :? - Muestra este menú de ayuda\n"
+  ++ "- :q - Termina la ejecución\n"
+  ++ "- :v - Lista los valores guardados de variables\n"
+  ++ "- :c - Lista las definiciones guardadas de comandos\n"
+  ++ "- :l archivo.logo - Carga el archivo con comandos\n"
+  ++ "- :sg archivo.gif - Guarda el dibujo actual en un GIF animado\n"
+  ++ "- :sp archivo.png - Guarda el dibujo actual en una imagen PNG"
 
 makeFileName :: String -> Maybe FilePath
 makeFileName str = case dropWhile isSpace str of

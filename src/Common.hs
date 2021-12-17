@@ -85,6 +85,7 @@ data Comm =
   | Arco Exp Exp
   | Texto String
   | SetSizeTexto Exp
+  | Undo
   | Skip -- Comando que no hace nada
 
 data Output = Ready
@@ -221,6 +222,7 @@ instance Show Comm where
   show (Arco e1 e2) = "arc " ++ showAtomExp e1 ++ " " ++ showAtomExp e2
   show (Texto str) = "label \"" ++ str
   show (SetSizeTexto e) = "setlabelheight " ++ showAtomExp e
+  show Undo = "undo"
   show Skip = "skip"
 
 dropEnd :: [a] -> Int -> [a]

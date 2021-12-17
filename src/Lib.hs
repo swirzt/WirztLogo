@@ -114,7 +114,7 @@ normalize :: Float -> Float
 normalize = normalizeAngle
 
 rect :: Float -> Float -> Picture
-rect x y = polygon $ rectanglePath x y
+rect x y = rectangleSolid x y
 
 -- Esta tortuga mira por defecto hacia arriba ya que es lo que le corresponde al ángulo 0
 tortuga :: Picture

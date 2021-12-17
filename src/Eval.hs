@@ -132,8 +132,12 @@ eval e (Arco e1 e2) = do
   dir <- getDir
   ee1 <- runExp e e1
   ee2 <- runExp e e2
-  let degdir = radian2grad dir
-      a = translate x y $ arc degdir ee1 ee2
+  let degdir = 90 - radian2grad dir
+      ee1dir = 90 - ee1
+      (a1, a2) = if ee1 < 0
+                 then (degdir, ee1dir)
+                 else (ee1dir, degdir)
+      a = translate x y $ arc a1 a2 ee2
   addPicture a
   noth
 eval _ (Texto str) = do
@@ -147,6 +151,7 @@ eval _ (Texto str) = do
   addPicture a
   noth
 eval e (SetSizeTexto expp) = runExp e expp >>= setSizeT . (/ 10) >> noth
+eval _ Undo = undoPic >> noth
 eval _ Skip = noth
 
 forLoop :: MonadLogo m
