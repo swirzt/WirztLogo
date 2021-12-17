@@ -3,7 +3,8 @@ module Eval where
 -- Imports de librerías
 import           Data.Functor ((<&>))
 import           GHC.Float.RealFracMethods (floorFloatInt)
-import           Graphics.Gloss (arc, line, rotate, scale, text, translate)
+import           Graphics.Gloss (thickArc, line, rotate, scale, text, translate
+                               , rectangleUpperSolid, thickCircle, pictures)
 import           Relude.List ((!!?))
 --  Imports locales
 import           Common (Comm(..), Exp(..), getBoolOp, getNumOp, ifF)
@@ -12,12 +13,34 @@ import           MonadLogo
 
 type EvalRet = [([Exp], Comm)]
 
-moveTo :: MonadLogo m => Float -> Float -> m EvalRet
-moveTo x y = do
+hipotenusa :: Float -> Float -> Float
+hipotenusa 0 y = y
+hipotenusa x 0 = x
+hipotenusa x y
+  | x == y = sqrt 2 * x
+  | otherwise = sqrt ((x * x) + (y * y))
+
+moveTo :: MonadLogo m => Bool -> Float -> Float -> m EvalRet
+moveTo b x y = do
   xc <- getX
   yc <- getY
-  let p = [(x, y), (xc, yc)]
-      l = line p
+  w <- getWidth
+  dir <- getDir
+  otroDir <- getAngle x y
+  let l = if w > 0
+          then let alto = hipotenusa (x - xc) (y - yc)
+                   rect = rectangleUpperSolid w alto
+                   half = w / 2
+                   r = half / 2
+                   circ1 = thickCircle r half
+                   circ2 = translate 0 alto circ1
+               in translate xc yc
+                  $ rotate
+                    (if b
+                     then (radian2grad dir)
+                     else otroDir)
+                  $ pictures [rect, circ1, circ2]
+          else line [(x, y), (xc, yc)]
   addPicture l
   setX x
   setY y
@@ -32,13 +55,13 @@ moveLine e expp f = do
   a <- getDir
   let x' = f x (sin a * n) -- Cambio las trigonométricas por como se presenta el plano cartesiano
       y' = f y (cos a * n)
-  moveTo x' y'
+  moveTo True x' y'
 
 setTo :: MonadLogo m => m Float -> m Float -> m EvalRet
 setTo f g = do
   x <- f
   y <- g
-  moveTo x y
+  moveTo False x y
 
 modDir :: MonadLogo m => [Exp] -> Exp -> (Float -> m ()) -> m EvalRet
 modDir e expp f = do
@@ -82,7 +105,7 @@ eval _ PUp = penUp >> noth
 eval _ PDown = penDn >> noth
 eval _ HideT = hideT >> noth
 eval _ ShowT = showT >> noth
-eval _ Home = moveTo 0 0
+eval _ Home = moveTo False 0 0
 eval e (SetX expp) = setTo (runExp e expp) getY
 eval e (SetY expp) = setTo getX (runExp e expp)
 eval e (SetXY exp1 exp2) = setTo (runExp e exp1) (runExp e exp2)
@@ -132,8 +155,9 @@ eval e (Arco e1 e2) = do
   dir <- getDir
   ee1 <- runExp e e1
   ee2 <- runExp e e2
+  w <- getWidth
   let degdir = radian2grad dir
-      a = translate x y $ arc degdir ee1 ee2
+      a = translate x y $ thickArc degdir ee1 ee2 w
   addPicture a
   noth
 eval _ (Texto str) = do
@@ -147,6 +171,10 @@ eval _ (Texto str) = do
   addPicture a
   noth
 eval e (SetSizeTexto expp) = runExp e expp >>= setSizeT . (/ 10) >> noth
+eval e (ChangeWidth expp) = runExp e expp
+  >>= \x -> if x < 0
+            then failLogo "Error, el ancho del lapiz no puede ser menor a 0"
+            else setWidth x >> noth
 eval _ Skip = noth
 
 forLoop :: MonadLogo m
@@ -183,19 +211,12 @@ cuadrante rad x y = if x >= 0
                          else rad + 360
                     else rad + 180
 
-runExp :: MonadLogo m => [Exp] -> Exp -> m Float
-runExp _ (Num n) = return n
-runExp e (Negative expp) = runExp e expp >>= \x -> return (-x)
-runExp _ XCor = getX
-runExp _ YCor = getY
-runExp _ Heading = getDir <&> radian2grad
-runExp e (Towards e1 e2) = do
-  x <- getX
-  y <- getY
-  x' <- runExp e e1
-  y' <- runExp e e2
-  let vx = y' - y
-      vy = x' - x
+getAngle :: MonadLogo m => Float -> Float -> m Float
+getAngle x y = do
+  xa <- getX
+  ya <- getY
+  let vx = y - ya
+      vy = x - xa
       tangente = vy / vx
       angle = atan tangente
       grad = if vx == 0
@@ -203,7 +224,18 @@ runExp e (Towards e1 e2) = do
                   then 90
                   else 270
              else cuadrante (radian2grad angle) vx vy
-  return grad -- No se como probar que esto sea correcto
+  return grad
+
+runExp :: MonadLogo m => [Exp] -> Exp -> m Float
+runExp _ (Num n) = return n
+runExp e (Negative expp) = runExp e expp >>= \x -> return (-x)
+runExp _ XCor = getX
+runExp _ YCor = getY
+runExp _ Heading = getDir <&> radian2grad
+runExp e (Towards e1 e2) = do
+  x <- runExp e e1
+  y <- runExp e e2
+  getAngle x y
 runExp _ (Var name) = getVar name
 runExp e (BinaryOp f x y) = binary e x y (getNumOp f)
 runExp e Read = do

@@ -45,6 +45,7 @@ import Debug.Trace
       arc               { TokenArc }
       label             { TokenLabel }
       labelS            { TokenLabelS }
+      width             { TokenWidth }
       
 
       str               { TokenStr $$ }
@@ -128,6 +129,7 @@ Comm : fordward Exp                                { Ford $2 }
      | arc Exp Exp                                 { Arco $2 $3 }
      | label str                                   { Texto $2 }
      | labelS Exp                                  { SetSizeTexto $2 }
+     | width Exp                                   { ChangeWidth $2 }
      | '(' Comm ')'                                { $2 }
 
 Args :: { [String] }
@@ -268,6 +270,7 @@ data Token = TokenFd
            | TokenLabelS
            | TokenEOF
            | TokenDot
+           | TokenWidth
 
 lexerP :: (Token -> P a) -> P a
 lexerP cont str line char =
@@ -371,6 +374,7 @@ lexVar cs =
       ("arc",rest) -> (TokenArc, rest, 3)
       ("label",rest) -> (TokenLabel, rest, 5)
       ("setlabelheight",rest) -> (TokenLabelS, rest, 14)
+      ("setwidth",rest) -> (TokenWidth, rest, 8)
       (var,rest) -> (TokenVarC var, rest, length var)
 
 unLexer :: Token -> String
@@ -436,4 +440,5 @@ unLexer TokenLabel = "label"
 unLexer TokenLabelS = "setlabelheight"
 unLexer TokenEOF = "Fin del archivo"
 unLexer TokenDot = "\'.\'"
+unLexer TokenWidth = "setwidth"
 }

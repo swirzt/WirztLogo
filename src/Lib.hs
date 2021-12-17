@@ -101,6 +101,7 @@ comm2Bound v (CommVar str xs) = let ys = map (exp2Bound v) xs
 comm2Bound v (ChangeScale expp) = unary2Bound v expp ChangeScale
 comm2Bound v (Arco e1 e2) = binary2Bound v e1 e2 Arco
 comm2Bound v (SetSizeTexto e) = unary2Bound v e SetSizeTexto
+comm2Bound v (ChangeWidth e) = unary2Bound v e ChangeWidth
 comm2Bound _ c = c
 
 grad2radian :: Float -> Float
@@ -114,7 +115,7 @@ normalize :: Float -> Float
 normalize = normalizeAngle
 
 rect :: Float -> Float -> Picture
-rect x y = polygon $ rectanglePath x y
+rect = rectangleSolid
 
 -- Esta tortuga mira por defecto hacia arriba ya que es lo que le corresponde al ángulo 0
 tortuga :: Picture

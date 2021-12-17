@@ -62,6 +62,9 @@ getDir = getData dir
 getSizeT :: MonadLogo m => m Float
 getSizeT = getData sizeT
 
+getWidth :: MonadLogo m => m Float
+getWidth = getData penSize
+
 addPicture :: MonadLogo m => Picture -> m ()
 addPicture p = do
   b <- getData pen
@@ -100,6 +103,9 @@ setScale n = modify (\s -> s { escala = n })
 
 setSizeT :: MonadLogo m => Float -> m ()
 setSizeT n = modify (\s -> s { sizeT = n })
+
+setWidth :: MonadLogo m => Float -> m ()
+setWidth n = modify (\s -> s { penSize = n })
 
 showT :: MonadLogo m => m ()
 showT = modify (\s -> s { GlobalEnv.show = True })
