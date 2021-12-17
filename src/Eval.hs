@@ -5,6 +5,7 @@ import           Data.Functor ((<&>))
 import           GHC.Float.RealFracMethods (floorFloatInt)
 import           Graphics.Gloss (arc, line, rotate, scale, text, translate)
 import           Relude.List ((!!?))
+import           Control.Monad (when)
 --  Imports locales
 import           Common (Comm(..), Exp(..), getBoolOp, getNumOp, ifF)
 import           Lib (grad2radian, parserExp, radian2grad)
@@ -133,12 +134,12 @@ eval e (Arco e1 e2) = do
   ee1 <- runExp e e1
   ee2 <- runExp e e2
   let degdir = 90 - radian2grad dir
-      ee1dir = 90 - ee1
+      todir = degdir - ee1
       (a1, a2) = if ee1 < 0
-                 then (degdir, ee1dir)
-                 else (ee1dir, degdir)
+                 then (degdir, todir)
+                 else (todir, degdir)
       a = translate x y $ arc a1 a2 ee2
-  addPicture a
+  when (ee1 /= 0) $ addPicture a
   noth
 eval _ (Texto str) = do
   x <- getX
