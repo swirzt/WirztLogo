@@ -18,7 +18,8 @@ import           System.Random (randomR)
 -- Imports locales
 import           Common (Comm, Input(Exit, Input), Output(GetExp, Show))
 import           GlobalEnv (Env(..))
-import           Lib (normalize, num2color, customColor)
+import           Lib (normalizeRad, normalizeDeg, num2color, customColor
+                    , grad2radian)
 
 class (MonadIO m, MonadState Env m, MonadError String m) => MonadLogo m
 
@@ -56,8 +57,11 @@ getX = getData posx
 getY :: MonadLogo m => m Float
 getY = getData posy
 
-getDir :: MonadLogo m => m Float
-getDir = getData dir
+getDirRad :: MonadLogo m => m Float
+getDirRad = getData dirRad
+
+getDirDeg :: MonadLogo m => m Float
+getDirDeg = getData dirDeg
 
 getSizeT :: MonadLogo m => m Float
 getSizeT = getData sizeT
@@ -74,8 +78,12 @@ addPicture p = do
 resetPics :: MonadLogo m => m ()
 resetPics = modify (\s -> s { pics = [] })
 
+tail' :: [a] -> [a]
+tail' [] = []
+tail' x = tail x
+
 undoPic :: MonadLogo m => m ()
-undoPic = modify (\s -> s { pics = tail $ pics s })
+undoPic = modify (\s -> s { pics = tail' $ pics s })
 
 setX :: MonadLogo m => Float -> m ()
 setX n = modify (\s -> s { posx = n })
@@ -90,10 +98,13 @@ changeY :: MonadLogo m => (Float -> Float -> Float) -> Float -> m ()
 changeY f n = getData posy >>= \y -> setY (f y n)
 
 setDir :: MonadLogo m => Float -> m ()
-setDir n = modify (\s -> s { dir = n })
+setDir n = modify (\s -> s { dirRad = grad2radian n, dirDeg = n })
 
 changeDir :: MonadLogo m => (Float -> Float -> Float) -> Float -> m ()
-changeDir f n = modify (\s -> s { dir = normalize (f (dir s) n) })
+changeDir f n = modify
+  (\s -> s { dirRad = normalizeRad $ f (dirRad s) $ grad2radian n
+           , dirDeg = normalizeDeg $ f (dirDeg s) n
+           })
 
 setColor :: MonadLogo m => Int -> m ()
 setColor n = modify (\s -> s { GlobalEnv.color = num2color n })

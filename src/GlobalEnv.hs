@@ -11,7 +11,8 @@ import           Common (Comm, Input, Output, dropEnd, showCommList)
 data Env =
   Env { posx :: Float  -- Representa la posición x de la tortuga
       , posy :: Float  -- Representa la posición y de la tortuga
-      , dir :: Float  -- Representa la dirección a donde mira la tortuga, representa los grados entre 0 y 2pi
+      , dirRad :: Float  -- Representa la dirección a donde mira la tortuga, en radianes
+      , dirDeg :: Float -- Representa la dirección a donde mira la tortuga, en grados
       , show :: Bool  -- Si es True, la tortuga se imprime en pantalla
       , pen :: Bool  -- Si es True, los movimientos de la tortuga no dibujan
       , color :: Color  -- Color del lápiz
@@ -30,7 +31,7 @@ data Env =
       }
 
 defaultEnv :: StdGen -> MVar Input -> MVar Output -> (Int, Int) -> Env
-defaultEnv = Env 0 0 0 True False black [] empty empty 5 0.1 False 0 0
+defaultEnv = Env 0 0 0 0 True False black [] empty empty 5 0.1 False 0 0
 
 tupexp :: (String, Float) -> String
 tupexp (str, a) = str ++ ": " ++ Prelude.show a ++ "\n"

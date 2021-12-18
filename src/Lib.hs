@@ -1,7 +1,8 @@
 module Lib
     ( parserExp
     , parserComm
-    , normalize
+    , normalizeRad
+    , normalizeDeg
     , getTortu
     , rect
     , num2color
@@ -114,8 +115,15 @@ radian2grad :: Float -> Float
 radian2grad = radToDeg
 
 -- Mantiene el ángulo entre 0 y 2pi
-normalize :: Float -> Float
-normalize = normalizeAngle
+normalizeRad :: Float -> Float
+normalizeRad = normalizeAngle
+
+-- Mantiene el ángulo entre 0 y 360
+normalizeDeg :: Float -> Float
+normalizeDeg n
+  | n < 0 = until (>= 0) (+ 360) n
+  | n > 360 = until (<= 360) (\x -> x - 360) n
+  | otherwise = n
 
 rect :: Float -> Float -> Picture
 rect = rectangleSolid
@@ -134,7 +142,7 @@ tortuga = scale 0.1 0.1
     ]
 
 getTortu :: Float -> Float -> Float -> Picture
-getTortu x y n = translate x y $ rotate (radian2grad n) tortuga
+getTortu x y n = translate x y $ rotate n tortuga
 
 customColor :: Float -> Float -> Float -> Color
 customColor r g b = makeColor (r / 255) (g / 255) (b / 255) 1

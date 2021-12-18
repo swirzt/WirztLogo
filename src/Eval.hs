@@ -30,7 +30,7 @@ moveLine e expp f = do
   n <- runExp e expp
   x <- getX
   y <- getY
-  a <- getDir
+  a <- getDirRad
   let x' = f x (sin a * n) -- Cambio las trigonométricas por como se presenta el plano cartesiano
       y' = f y (cos a * n)
   moveTo x' y'
@@ -42,11 +42,7 @@ setTo f g = do
   moveTo x y
 
 modDir :: MonadLogo m => [Exp] -> Exp -> (Float -> m ()) -> m EvalRet
-modDir e expp f = do
-  n <- runExp e expp
-  let radN = grad2radian n
-  f radN
-  noth
+modDir e expp f = runExp e expp >>= f >> noth
 
 repeatComm :: MonadLogo m => [Exp] -> Exp -> [Comm] -> m EvalRet
 repeatComm e expp com = do
@@ -145,10 +141,10 @@ eval e (ChangeScale expp) = runExp e expp >>= setScale >> noth
 eval e (Arco e1 e2) = do
   x <- getX
   y <- getY
-  dir <- getDir
+  dir <- getDirDeg
   ee1 <- runExp e e1
   ee2 <- runExp e e2
-  let degdir = 90 - radian2grad dir
+  let degdir = 90 - dir
       todir = degdir - ee1
       (a1, a2) = if ee1 < 0
                  then (degdir, todir)
@@ -160,10 +156,9 @@ eval e (Arco e1 e2) = do
 eval _ (Texto str) = do
   x <- getX
   y <- getY
-  dir <- getDir
+  dir <- getDirDeg
   size <- getSizeT
-  let degdir = radian2grad dir
-      ang = -90 + degdir
+  let ang = -90 + dir
       a = scale size size $ translate x y $ rotate ang $ text str
   addPicture a
   noth
@@ -199,18 +194,17 @@ bool2Float True = return 1
 bool2Float False = return 0
 
 cuadrante :: Float -> Float -> Float -> Float
-cuadrante rad x y = if x >= 0
-                    then if y >= 0
-                         then rad
-                         else rad + 360
-                    else rad + 180
+cuadrante rad x y
+  | x >= 0 && y >= 0 = rad
+  | x >= 0 = rad + 360
+  | otherwise = rad + 180
 
 runExp :: MonadLogo m => [Exp] -> Exp -> m Float
 runExp _ (Num n) = return n
 runExp e (Negative expp) = runExp e expp >>= \x -> return (-x)
 runExp _ XCor = getX
 runExp _ YCor = getY
-runExp _ Heading = getDir <&> radian2grad
+runExp _ Heading = getDirDeg
 runExp e (Towards e1 e2) = do
   x <- getX
   y <- getY

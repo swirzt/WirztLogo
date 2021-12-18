@@ -39,7 +39,7 @@ env2Pic :: Model -> IO Picture
 env2Pic (_, e) =
   let x = posx e
       y = posy e
-      d = dir e
+      d = dirDeg e
       b = GlobalEnv.show e
       picc = pics e
       esc = escala e
