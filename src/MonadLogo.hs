@@ -18,7 +18,7 @@ import           System.Random (randomR)
 -- Imports locales
 import           Common (Comm, Input(Exit, Input), Output(GetExp, Show))
 import           GlobalEnv (Env(..))
-import           Lib (normalize, num2color)
+import           Lib (normalize, num2color, customColor)
 
 class (MonadIO m, MonadState Env m, MonadError String m) => MonadLogo m
 
@@ -97,6 +97,9 @@ changeDir f n = modify (\s -> s { dir = normalize (f (dir s) n) })
 
 setColor :: MonadLogo m => Int -> m ()
 setColor n = modify (\s -> s { GlobalEnv.color = num2color n })
+
+setCustomColor :: MonadLogo m => Float -> Float -> Float -> m ()
+setCustomColor r g b = modify (\s -> s { GlobalEnv.color = customColor r g b })
 
 setScale :: MonadLogo m => Float -> m ()
 setScale n = modify (\s -> s { escala = n })

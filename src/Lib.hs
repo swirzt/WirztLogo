@@ -8,7 +8,9 @@ module Lib
     , grad2radian
     , radian2grad
     , exp2Bound
-    , comm2Bound) where
+    , comm2Bound
+    , isReserved
+    , customColor) where
 
 -- Imports de librerías
 import           Data.Char (toLower)
@@ -18,7 +20,7 @@ import           Graphics.Gloss.Geometry.Angle (degToRad, normalizeAngle
                                               , radToDeg)
 -- Imports locales
 import           Common (Comm(..), Exp(..))
-import           LogoPar (logoComm, logoExp)
+import           LogoPar (logoComm, logoExp, lexer, Token(TokenVarC))
 
 parserExp :: String -> Either String Exp
 parserExp s = logoExp (map toLower s) 0 0
@@ -69,6 +71,8 @@ comm2Bound v (Rep e xs) = let ys = map (comm2Bound v) xs
                           in Rep ee ys
 comm2Bound v (Print e) = unary2Bound v e Print
 comm2Bound v (SetCo e) = unary2Bound v e SetCo
+comm2Bound v (SetCoCustom e1 e2 e3) =
+  unary2Bound v e3 (binary2Bound v e1 e2 SetCoCustom)
 comm2Bound v (IfC e xs ys) =
   let xs' = map (comm2Bound v) xs
       ys' = map (comm2Bound v) ys
@@ -114,7 +118,7 @@ normalize :: Float -> Float
 normalize = normalizeAngle
 
 rect :: Float -> Float -> Picture
-rect x y = rectangleSolid x y
+rect = rectangleSolid
 
 -- Esta tortuga mira por defecto hacia arriba ya que es lo que le corresponde al ángulo 0
 tortuga :: Picture
@@ -154,3 +158,8 @@ num2color i = case i of
   14 -> orange
   15 -> customColor 128 128 128 -- gray
   _  -> undefined
+
+isReserved :: String -> Bool
+isReserved str = case lexer str of
+  (TokenVarC _, _, _) -> False
+  (_, _, _)           -> True

@@ -33,6 +33,7 @@ import Debug.Trace
       to                { TokenTo }
       end               { TokenEnd }
       setcolor          { TokenSetCo }
+      setcustomcolor    { TokenSetCoCustom }
       make              { TokenMk }
       for               { TokenFor }
       if                { TokenIf }
@@ -115,6 +116,7 @@ Comm : fordward Exp                                { Ford $2 }
      | print Exp                                   { Print $2 }
      | print str                                   { PrintStr $2 }
      | setcolor Exp                                { SetCo $2 }
+     | setcustomcolor Exp Exp Exp                  { SetCoCustom $2 $3 $4 }
      | if Exp '[' CommSeq ']' '[' CommSeq ']'      { IfC $2 $4 $7 }
      | to varC Args CommSeq end                    { Def $2 $3 $4 }
      | make str Exp                                { Save $2 $3 }
@@ -228,6 +230,7 @@ data Token = TokenFd
            | TokenTo 
            | TokenEnd 
            | TokenSetCo 
+           | TokenSetCoCustom
            | TokenMk  
            | TokenFor  
            | TokenIf
@@ -356,6 +359,7 @@ lexVar cs =
       ("to",rest) -> (TokenTo, rest, 2)
       ("end",rest) -> (TokenEnd, rest, 3)
       ("setcolor",rest) -> (TokenSetCo, rest, 8)
+      ("setcustomcolor",rest) -> (TokenSetCoCustom, rest, 14)
       ("make",rest) -> (TokenMk, rest, 4)
       ("for",rest) -> (TokenFor, rest, 3)
       ("if",rest) -> (TokenIf, rest, 2)
@@ -400,6 +404,7 @@ unLexer TokenPrnt  = "print"
 unLexer TokenTo  = "to"
 unLexer TokenEnd  = "end"
 unLexer TokenSetCo  = "setcolor"
+unLexer TokenSetCoCustom = "setcustomcolor"
 unLexer TokenMk   = "make"
 unLexer TokenFor   = "for"
 unLexer TokenIf = "if"

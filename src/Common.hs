@@ -15,8 +15,14 @@ data BoolOps = Lt
              | And
              | Or
 
+eps :: Float
+eps = 0.00005
+
+eq :: Float -> Float -> Bool
+eq x y = abs (x - y) < eps
+
 ifF :: Float -> Bool
-ifF = (/= 0)
+ifF = not . eq 0
 
 getNumOp :: NumOps -> (Float -> Float -> Float)
 getNumOp Add = (+)
@@ -72,6 +78,7 @@ data Comm =
   | Print Exp
   | PrintStr String
   | SetCo Exp
+  | SetCoCustom Exp Exp Exp
   | IfC Exp [Comm] [Comm]
   | Def String [String] [Comm]
   | Save String Exp
@@ -120,6 +127,11 @@ instance Show BoolOps where
   show And = " && "
   show Or = " || "
 
+concatSepWith :: [String] -> String -> String
+concatSepWith [] _ = ""
+concatSepWith [x] _ = x
+concatSepWith (x:xs) s = x ++ s ++ concatSepWith xs s
+
 isAtomExp :: Exp -> Bool
 isAtomExp (Num _) = True
 isAtomExp (Negative _) = True
@@ -142,16 +154,17 @@ showAtomExp e = let se = show e
 
 instance Show Exp where
   show (Num f) = show f
-  show (Negative e) = '-':show e
+  show (Negative e) = '-':showAtomExp e
   show XCor = "xcor"
   show YCor = "ycor"
   show Heading = "heading"
-  show (Towards e1 e2) = "tomards " ++ showAtomExp e1 ++ " " ++ showAtomExp e2
+  show (Towards e1 e2) =
+    concatSepWith ["tomards", showAtomExp e1, showAtomExp e2] " "
   show (Var str) = ':':str
   show (BinaryOp op e1 e2) = showAtomExp e1 ++ show op ++ showAtomExp e2
   show Read = "readword"
   show (IfE e1 e2 e3) =
-    "if " ++ showAtomExp e1 ++ " " ++ showAtomExp e2 ++ " " ++ showAtomExp e3
+    concatSepWith ["if", showAtomExp e1, showAtomExp e2, showAtomExp e3] " "
   show (Access i) = '!':show i
   show (Compare op e1 e2) = showAtomExp e1 ++ show op ++ showAtomExp e2
   show (Not e) = "not " ++ showAtomExp e
@@ -177,49 +190,44 @@ instance Show Comm where
   show Home = "home"
   show (SetX e) = "setx " ++ showAtomExp e
   show (SetY e) = "sety " ++ showAtomExp e
-  show (SetXY e1 e2) = "setxy " ++ showAtomExp e1 ++ " " ++ showAtomExp e2
+  show (SetXY e1 e2) =
+    concatSepWith ["setxy", showAtomExp e1, showAtomExp e2] " "
   show (SetHead e) = "seth " ++ showAtomExp e
-  show (Rep e cs) = "repeat " ++ showAtomExp e ++ " " ++ showCommList cs
+  show (Rep e cs) =
+    concatSepWith ["repeat", showAtomExp e, showCommList cs] " "
   show (Print e) = "print " ++ showAtomExp e
   show (PrintStr str) = "print \"" ++ str
   show (SetCo e) = "setcolor " ++ showAtomExp e
-  show (IfC e cs1 cs2) = "if "
-    ++ showAtomExp e
-    ++ " "
-    ++ showCommList cs1
-    ++ " "
-    ++ showCommList cs2
-  show (Def str ss cs) = "to "
-    ++ str
-    ++ " "
-    ++ concatMap (\s -> '\"':s ++ " ") ss
-    ++ showCommList cs
+  show (SetCoCustom e1 e2 e3) = concatSepWith
+    ["setcustomcolor", showAtomExp e1, showAtomExp e2, showAtomExp e3]
+    " "
+  show (IfC e cs1 cs2) =
+    concatSepWith ["if", showAtomExp e, showCommList cs1, showCommList cs2] " "
+  show (Def str ss cs) = concatSepWith
+    ["to", str, concatMap (\s -> '\"':s ++ " ") ss ++ showCommList cs]
+    " "
   show (Save str e) = "make \"" ++ str ++ " " ++ showAtomExp e
-  show (For str e1 e2 cs) = "for [\""
-    ++ str
-    ++ " "
-    ++ showAtomExp e1
-    ++ " "
-    ++ showAtomExp e2
-    ++ "] "
-    ++ showCommList cs
-  show (ForDelta str e1 e2 e3 cs) = "for [\""
-    ++ str
-    ++ " "
-    ++ showAtomExp e1
-    ++ " "
-    ++ showAtomExp e2
-    ++ " "
-    ++ showAtomExp e3
-    ++ "] "
-    ++ showCommList cs
+  show (For str e1 e2 cs) = concatSepWith
+    ["for", "[\"" ++ str, showAtomExp e1, showAtomExp e2, "]", showCommList cs]
+    " "
+  show (ForDelta str e1 e2 e3 cs) = concatSepWith
+    [ "for"
+    , "[\"" ++ str
+    , showAtomExp e1
+    , showAtomExp e2
+    , showAtomExp e3
+    , "]"
+    , showCommList cs]
+    " "
   show (Wait e) = "wait " ++ showAtomExp e
-  show (While e cs) = "while " ++ showAtomExp e ++ " " ++ showCommList cs
-  show (DoWhile cs e) = "do.while " ++ showCommList cs ++ " " ++ showAtomExp e
+  show (While e cs) =
+    concatSepWith ["while", showAtomExp e, showCommList cs] " "
+  show (DoWhile cs e) =
+    concatSepWith ["do.while", showCommList cs, showAtomExp e] " "
   show (CommVar str es) =
     str ++ " " ++ dropEnd (foldr (\e st -> showAtomExp e ++ " " ++ st) "" es) 1
   show (ChangeScale e) = "scale " ++ showAtomExp e
-  show (Arco e1 e2) = "arc " ++ showAtomExp e1 ++ " " ++ showAtomExp e2
+  show (Arco e1 e2) = concatSepWith ["arc", showAtomExp e1, showAtomExp e2] " "
   show (Texto str) = "label \"" ++ str
   show (SetSizeTexto e) = "setlabelheight " ++ showAtomExp e
   show Undo = "undo"

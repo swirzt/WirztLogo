@@ -8,7 +8,7 @@ import           Relude.List ((!!?))
 import           Control.Monad (when)
 --  Imports locales
 import           Common (Comm(..), Exp(..), getBoolOp, getNumOp, ifF)
-import           Lib (grad2radian, parserExp, radian2grad)
+import           Lib (grad2radian, parserExp, radian2grad, isReserved)
 import           MonadLogo
 
 type EvalRet = [([Exp], Comm)]
@@ -98,14 +98,29 @@ eval e (SetCo c) = do
     then setColor n >> noth
     else failLogo
       "Se quizo cambiar el color a un número fuera de rango, los colores van del 0 al 15"
+eval e (SetCoCustom e1 e2 e3) = do
+  r <- runExp e e1
+  g <- runExp e e2
+  b <- runExp e e3
+  if all (\x -> x >= 0 && x <= 255) [r, g, b]
+    then setCustomColor r g b >> noth
+    else failLogo "Uno de los colores no está en el rango de [0,255]"
 eval e (IfC eb xs ys) = do
   b <- runExp e eb
   if ifF b
     then return $ mapCom e xs
     else return $ mapCom e ys
-eval _ (Def name ns cs) = newComm name (length ns) cs >> noth
+eval _ (Def "" _ _) = failLogo "No se dió un nombre al comando a definir"
+eval _ (Def name ns cs)
+  | isReserved
+    name = failLogo "El comando que se quiere definir es una palabra reservada"
+  | otherwise = newComm name (length ns) cs >> noth
+eval _ (Save "" _) = failLogo "No se dió un nombre a la variable a definir"
 eval e (Save str expp) = runExp e expp >>= newVar str >> noth
+eval _ (For "" _ _ _) = failLogo "No se dió un nombre a la variable del for"
 eval e (For str initt end xs) = forLoop e initt end xs (+ 1) (For str)
+eval _ (ForDelta "" _ _ _ _) =
+  failLogo "No se dió un nombre a la variable del for"
 eval e (ForDelta str initt end delta xs) = do
   fdelta <- runExp e delta
   forLoop e initt end xs (+ fdelta) (\e1 e2 -> ForDelta str e1 e2 (Num fdelta))
@@ -139,7 +154,8 @@ eval e (Arco e1 e2) = do
                  then (degdir, todir)
                  else (todir, degdir)
       a = translate x y $ arc a1 a2 ee2
-  when (ee1 /= 0) $ addPicture a
+  when (ifF ee1)
+    $ addPicture a -- Si el ángulo es 0 no genero el arco, aprovecho lazyness
   noth
 eval _ (Texto str) = do
   x <- getX
