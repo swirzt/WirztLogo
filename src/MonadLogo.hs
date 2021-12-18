@@ -5,7 +5,7 @@
 module MonadLogo where
 
 -- Imports de librerías
-import           Control.Concurrent (putMVar, takeMVar, threadDelay)
+import           Control.Concurrent (putMVar, takeMVar)
 import           Control.Monad (when)
 import           Control.Monad.Except (ExceptT, MonadError(..), MonadIO(..)
                                      , runExceptT)

@@ -8,7 +8,7 @@ import           Relude.List ((!!?))
 import           Control.Monad (when)
 --  Imports locales
 import           Common (Comm(..), Exp(..), getBoolOp, getNumOp, ifF)
-import           Lib (grad2radian, parserExp, radian2grad, isReserved)
+import           Lib (parserExp, radian2grad, isReserved)
 import           MonadLogo
 
 type EvalRet = [([Exp], Comm)]
@@ -219,7 +219,7 @@ runExp e (Towards e1 e2) = do
                   then 90
                   else 270
              else cuadrante (radian2grad angle) vx vy
-  return grad -- No se como probar que esto sea correcto
+  return grad
 runExp _ (Var name) = getVar name
 runExp e (BinaryOp f x y) = binary e x y (getNumOp f)
 runExp e Read = do

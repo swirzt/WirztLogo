@@ -57,9 +57,29 @@ evalStepComm e ((ex, x):xs) = runLogo e (eval ex x)
     Right (listComm, e') -> let retComm = listComm ++ xs
                             in return (Just retComm, e')
 
+inputHandler :: Model -> Input -> IO Model
+inputHandler _ Exit = exitSuccess -- Todo el programa termina
+inputHandler m@(_, e) (Input xs) = case parserComm xs of
+  Left err -> putMVar (out e) (Error err) >> return m -- El parseo falló
+  Right [] -> putMVar (out e) Ready >> return m -- El parseo dió vacío
+  Right ys -> evalStepComm e $ map (\c -> ([], comm2Bound [] c)) ys -- El parseo funcionó
+inputHandler (_, e) (ToFile ft xs) = toFile ft xs e >> exitSuccess -- Quería poder seguir después de guardar pero da error
+inputHandler m@(_, e) (LoadFile xs) = getFile xs
+  >>= \zs -> case parserComm zs of
+    Left err -> putMVar (out e) (Error $ err ++ " En el archivo: " ++ xs)
+      >> return m
+    Right [] -> putMVar (out e) Ready >> return m
+    Right ys -> evalStepComm e $ map (\c -> ([], comm2Bound [] c)) ys
+inputHandler m@(_, e) ListV =
+  let v = showVars e
+  in putMVar (out e) (Show v) >> putMVar (out e) Ready >> return m
+inputHandler m@(_, e) ListC =
+  let c = showComm e
+  in putMVar (out e) (Show c) >> putMVar (out e) Ready >> return m
+
 -- Avanza el modelo un paso
 step :: a -> Float -> Model -> IO Model
-step _ f m@(n, e)
+step _ f (n, e)
   | wait e = let newAcum = acumWait e + (f * 1000)
                  e' = if newAcum >= limitWait e
                       then e { wait = False }
@@ -68,25 +88,9 @@ step _ f m@(n, e)
 step _ _ m@(Nothing, e) = do
   input <- tryTakeMVar $ inp e -- Intenta leer de la MVar
   case input of
-    Nothing -> return m -- No hay cosas nuevas
+    Nothing   -> return m -- No hay cosas nuevas
     Just Exit -> exitSuccess -- Todo el programa termina
-    Just (Input xs) -> case parserComm xs of
-      Left err -> putMVar (out e) (Error err) >> return m -- El parseo falló
-      Right [] -> putMVar (out e) Ready >> return m -- El parseo dió vacío
-      Right ys -> evalStepComm e $ map (\c -> ([], comm2Bound [] c)) ys -- El parseo funcionó
-    Just (ToFile ft xs) -> toFile ft xs e >> exitSuccess -- Quería poder seguir después de guardar pero da error
-    Just (LoadFile xs) -> getFile xs
-      >>= \zs -> case parserComm zs of
-        Left err -> putMVar (out e) (Error $ err ++ " En el archivo: " ++ xs)
-          >> return m
-        Right [] -> putMVar (out e) Ready >> return m
-        Right ys -> evalStepComm e $ map (\c -> ([], comm2Bound [] c)) ys
-    Just ListV
-      -> let v = showVars e
-         in putMVar (out e) (Show v) >> putMVar (out e) Ready >> return m
-    Just ListC
-      -> let c = showComm e
-         in putMVar (out e) (Show c) >> putMVar (out e) Ready >> return m
+    Just i    -> inputHandler m i
 step _ _ (Just [], e) = putMVar (out e) Ready >> return (Nothing, e) -- Se terminó la ejecución actual
 step _ _ (Just xs, e) = evalStepComm e xs -- Se puede seguir ejecutando
 
