@@ -18,20 +18,24 @@ Comm ::= Comm Comm
        | print Exp
        | print String
        | setcolor Exp
-       | for [str Exp Exp Exp] [Comm]
-       | for [str Exp Exp] [Comm]
+       | setcustomcolor Exp Exp Exp
        | if Exp [Comm] [Comm]
-       | to String Args Comm end
+       | to Name [String] Comm end
        | make String Exp
+       | for [str Exp Exp] [Comm]
+       | for [str Exp Exp Exp] [Comm]
+       | to String Args Comm end
        | wait Exp
-       | do.while [Comm] Exp
        | while Exp [Comm]
-       | Strin [Exp]
+       | do.while [Comm] Exp
+       | Name [Exp]
        | scale Exp
        | arc Exp Exp
        | label Str
        | setlabelheight Exp
+       | undo
        | skip
+       | ( comm )
        
 Exp ::= Float
         | - Exp
