@@ -108,15 +108,16 @@ comm2Bound v (Arco e1 e2) = binary2Bound v e1 e2 Arco
 comm2Bound v (SetSizeTexto e) = unary2Bound v e SetSizeTexto
 comm2Bound _ c = c
 
+
+-- Estas 3 funciones las definí a mano y después vi que había una implementación del paquete Gloss
 grad2radian :: Float -> Float
 grad2radian = degToRad
-
 radian2grad :: Float -> Float
 radian2grad = radToDeg
-
 -- Mantiene el ángulo entre 0 y 2pi
 normalizeRad :: Float -> Float
 normalizeRad = normalizeAngle
+--
 
 -- Mantiene el ángulo entre 0 y 360
 normalizeDeg :: Float -> Float

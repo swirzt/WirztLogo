@@ -24,7 +24,6 @@ Comm ::= Comm Comm
        | make String Exp
        | for [str Exp Exp] [Comm]
        | for [str Exp Exp Exp] [Comm]
-       | to String Args Comm end
        | wait Exp
        | while Exp [Comm]
        | do.while [Comm] Exp
