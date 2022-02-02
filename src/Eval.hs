@@ -7,8 +7,8 @@ import           Graphics.Gloss (arc, line, rotate, scale, text, translate)
 import           Relude.List ((!!?))
 import           Control.Monad (when)
 --  Imports locales
-import           Common (Comm(..), Exp(..), getBoolOp, getNumOp, ifF)
-import           Lib (parserExp, radian2grad, isReserved)
+import           Common (Comm(..), Exp(..))
+import           Lib (parserExp, radian2grad, isReserved, getBoolOp, getNumOp, ifF)
 import           MonadLogo
 
 type EvalRet = [([Exp], Comm)]

@@ -1,2 +1,0 @@
-cambio de forma (dibujar leon, perro, etc) (talVez bitmap)
-Parseador de comandos de consola (como compi)

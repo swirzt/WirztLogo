@@ -15,31 +15,6 @@ data BoolOps = Lt
              | And
              | Or
 
-eps :: Float
-eps = 0.00005
-
-eq :: Float -> Float -> Bool
-eq x y = abs (x - y) < eps
-
-ifF :: Float -> Bool
-ifF = not . eq 0
-
-getNumOp :: NumOps -> (Float -> Float -> Float)
-getNumOp Add = (+)
-getNumOp Sub = (-)
-getNumOp Mult = (*)
-getNumOp Div = (/)
-
-getBoolOp :: BoolOps -> (Float -> Float -> Bool)
-getBoolOp Lt = (<)
-getBoolOp Gt = (>)
-getBoolOp Eq = (==)
-getBoolOp GEq = (>=)
-getBoolOp LEq = (<=)
-getBoolOp Diff = (/=)
-getBoolOp And = \x y -> ifF x && ifF y
-getBoolOp Or = \x y -> ifF x || ifF y
-
 data Exp =
     Num Float
   | Negative Exp

@@ -216,6 +216,7 @@ exit i input = liftIO (putMVar i input)
 -- Lee un input de consola y lo envía por la variable Input
 -- El input puede ser una instrucción precedida por ':'
 {- Instrucciones:
+   - :? - Muestra el menú de ayuda
    - :q - Termina la ejecución
    - :v - Lista los valores guardados de variables
    - :c - Lista las definiciones guardadas de comandos

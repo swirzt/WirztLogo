@@ -11,7 +11,10 @@ module Lib
     , exp2Bound
     , comm2Bound
     , isReserved
-    , customColor) where
+    , customColor
+    ,getBoolOp
+    , getNumOp
+    , ifF) where
 
 -- Imports de librerías
 import           Data.Char (toLower)
@@ -20,8 +23,33 @@ import           Graphics.Gloss
 import           Graphics.Gloss.Geometry.Angle (degToRad, normalizeAngle
                                               , radToDeg)
 -- Imports locales
-import           Common (Comm(..), Exp(..))
+import           Common (Comm(..), Exp(..), NumOps(..), BoolOps(..))
 import           LogoPar (logoComm, logoExp, lexer, Token(TokenVarC))
+
+eps :: Float
+eps = 0.00005
+
+eq :: Float -> Float -> Bool
+eq x y = abs (x - y) < eps
+
+ifF :: Float -> Bool
+ifF = not . eq 0
+
+getNumOp :: NumOps -> (Float -> Float -> Float)
+getNumOp Add = (+)
+getNumOp Sub = (-)
+getNumOp Mult = (*)
+getNumOp Div = (/)
+
+getBoolOp :: BoolOps -> (Float -> Float -> Bool)
+getBoolOp Lt = (<)
+getBoolOp Gt = (>)
+getBoolOp Eq = (==)
+getBoolOp GEq = (>=)
+getBoolOp LEq = (<=)
+getBoolOp Diff = (/=)
+getBoolOp And = \x y -> ifF x && ifF y
+getBoolOp Or = \x y -> ifF x || ifF y
 
 parserExp :: String -> Either String Exp
 parserExp s = logoExp (map toLower s) 0 0
